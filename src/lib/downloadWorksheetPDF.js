@@ -87,7 +87,7 @@ export async function downloadWorksheetPDF(participant, session, responses) {
   const tableStartY = infoY + 28
 
   // ── Table ────────────────────────────────────────────────────────────────────
-  const head = [['Prompt', ...strengths]]
+  const head = [['', ...strengths]]
   const body = prompts.map((prompt, pi) => [
     prompt,
     ...strengths.map((_, si) => cellMap[`${pi}_${si}`] ?? ''),

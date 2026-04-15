@@ -54,9 +54,7 @@ export default function ResponseViewerModal({ participant, session, responses, o
           <table className="w-full text-sm border border-gray-200 rounded-xl overflow-hidden border-collapse">
             <thead>
               <tr className="bg-gray-50">
-                <th className="w-48 min-w-[160px] px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">
-                  Prompt
-                </th>
+                <th className="w-48 min-w-[160px] px-4 py-3 border-b border-r border-gray-200 bg-gray-50"></th>
                 {strengths.map((s, si) => {
                   const colors = getStrengthColors(s)
                   return (
