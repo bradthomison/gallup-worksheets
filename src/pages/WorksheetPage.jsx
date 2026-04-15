@@ -16,22 +16,20 @@ export default function WorksheetPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: part, error: partErr } = await supabase
-        .from('participants')
-        .select('*, sessions(*)')
-        .eq('worksheet_url_slug', slug)
-        .single()
+      // Use secure RPC — no public table policies needed
+      const { data, error: rpcErr } = await supabase
+        .rpc('get_worksheet_data', { p_slug: slug })
 
-      if (partErr || !part) { setError('Worksheet not found.'); setLoading(false); return }
+      if (rpcErr || !data) { setError('Worksheet not found.'); setLoading(false); return }
 
+      const part = data.participant
+      const sess = data.session
       setParticipant(part)
-      setSession(part.sessions)
+      setSession(sess)
 
-      // Load any existing responses
+      // Load any existing responses via RPC
       const { data: responses } = await supabase
-        .from('responses')
-        .select('*')
-        .eq('participant_id', part.id)
+        .rpc('get_worksheet_responses', { p_participant_id: part.id })
 
       if (responses?.length) {
         const cellMap = {}
