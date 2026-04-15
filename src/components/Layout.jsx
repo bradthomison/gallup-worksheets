@@ -13,9 +13,8 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-bold text-gray-900">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-500 text-white text-xs font-bold">G</span>
-            Gallup Strengths
+          <Link to="/">
+            <img src="/logo.png" alt="Gallup Strengths" className="h-10 w-auto" />
           </Link>
           <div className="flex items-center gap-6">
             <Link to="/" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
