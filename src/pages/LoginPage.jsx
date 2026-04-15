@@ -27,7 +27,7 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto mx-auto mb-4" />
+          <img src="/logo.png" alt="Gallup Strengths" className="w-full h-auto mb-4" />
           <p className="text-sm text-gray-500">Coach portal</p>
         </div>
 
