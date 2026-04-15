@@ -12,25 +12,22 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 font-bold text-gray-900">
             <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand-500 text-white text-xs font-bold">G</span>
             Gallup Strengths
           </Link>
-          <div className="flex items-center gap-4">
-            <Link to="/" className="text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors">
+          <div className="flex items-center gap-6">
+            <Link to="/" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Sessions
             </Link>
-            <Link to="/participants" className="text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors">
+            <Link to="/participants" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Participants
             </Link>
-            <Link to="/themes" className="text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors">
+            <Link to="/themes" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Themes
             </Link>
-            <Link to="/sessions/new" className="text-sm bg-brand-500 hover:bg-brand-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
-              + New Session
-            </Link>
-            <button onClick={handleSignOut} className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <button onClick={handleSignOut} className="text-base text-gray-500 hover:text-gray-700 font-semibold transition-colors">
               Sign out
             </button>
           </div>
