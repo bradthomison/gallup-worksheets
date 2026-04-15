@@ -1,5 +1,6 @@
 import StrengthBadge from './StrengthBadge'
 import { getStrengthColors } from '../lib/strengthColors'
+import { downloadWorksheetPDF } from '../lib/downloadWorksheetPDF'
 
 export default function ResponseViewerModal({ participant, session, responses, onClose }) {
   const prompts = session.prompts ?? []
@@ -28,13 +29,24 @@ export default function ResponseViewerModal({ participant, session, responses, o
               <p className="text-xs text-gray-400 mt-1">Submitted {formattedDate}</p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none mt-0.5"
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => downloadWorksheetPDF(participant, session, responses)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              Download PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         {/* Grid */}
