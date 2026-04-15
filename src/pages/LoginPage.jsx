@@ -27,9 +27,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Brand header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-brand-500 text-white text-2xl font-bold mb-4">G</div>
-          <h1 className="text-2xl font-bold text-gray-900">Gallup Strengths</h1>
-          <p className="text-sm text-gray-500 mt-1">Coach portal</p>
+          <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto mx-auto mb-4" />
+          <p className="text-sm text-gray-500">Coach portal</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-5">
