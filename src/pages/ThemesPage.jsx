@@ -53,13 +53,14 @@ function ThemeRow({ theme, onSave, onDelete }) {
           </svg>
           <div>
             <p className="font-semibold text-gray-900">{theme.name}</p>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-xs text-gray-400">{prompts.length} prompt{prompts.length !== 1 ? 's' : ''}</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                {prompts.length} prompt{prompts.length !== 1 ? 's' : ''}
+              </span>
               {theme.created_by_email && (
-                <>
-                  <span className="text-gray-300 text-xs">·</span>
-                  <p className="text-xs text-gray-400">Created by {theme.created_by_email}</p>
-                </>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {theme.created_by_email.split('@')[0]}
+                </span>
               )}
             </div>
           </div>
