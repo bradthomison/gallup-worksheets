@@ -134,10 +134,15 @@ export async function downloadWorksheetPDF(participant, session, responses) {
       fillColor: [252, 252, 253],
     },
     didParseCell(data) {
-      // Color each strength column header with its domain color
-      if (data.section === 'head' && data.column.index > 0) {
-        const color = headerColors[data.column.index - 1]
-        if (color) data.cell.styles.fillColor = color
+      if (data.section === 'head') {
+        if (data.column.index === 0) {
+          // Top-left corner — no fill
+          data.cell.styles.fillColor = [255, 255, 255]
+        } else {
+          // Color each strength column header with its domain color
+          const color = headerColors[data.column.index - 1]
+          if (color) data.cell.styles.fillColor = color
+        }
       }
     },
     // Wrap long cell text

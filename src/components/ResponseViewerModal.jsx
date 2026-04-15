@@ -58,8 +58,8 @@ export default function ResponseViewerModal({ participant, session, responses, o
                 {strengths.map((s, si) => {
                   const colors = getStrengthColors(s)
                   return (
-                    <th key={si} style={{ background: colors.bg, borderColor: '#e5e7eb' }} className="px-4 py-3 text-center border-b border-r last:border-r-0">
-                      <StrengthBadge name={s} />
+                    <th key={si} style={{ background: colors.headerBg, borderColor: 'rgba(255,255,255,0.2)' }} className="px-4 py-3 text-center border-b border-r last:border-r-0">
+                      <span style={{ color: colors.headerText, fontSize: '13px', fontWeight: 700, letterSpacing: '0.02em' }}>{s}</span>
                     </th>
                   )
                 })}
