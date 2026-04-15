@@ -43,7 +43,7 @@ export default function SessionPage() {
       supabase.from('sessions').select('*').eq('id', id).single(),
       supabase
         .from('participants')
-        .select('id, name, email, top5, worksheet_url_slug, responses(submitted_at)')
+        .select('id, name, email, top5, worksheet_url_slug, responses(id, submitted_at)')
         .eq('session_id', id)
         .order('name'),
     ])
@@ -173,6 +173,10 @@ export default function SessionPage() {
 
   function isSubmitted(participant) {
     return participant.responses?.some(r => r.submitted_at)
+  }
+
+  function isInProgress(participant) {
+    return participant.responses?.length > 0 && !participant.responses.some(r => r.submitted_at)
   }
 
   async function openResponses(participant) {
@@ -349,6 +353,14 @@ export default function SessionPage() {
                         >
                           <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                           {editing ? 'Submitted' : 'Submitted — View'}
+                        </button>
+                      ) : isInProgress(p) ? (
+                        <button
+                          onClick={() => !editing && openResponses(p)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-full transition-colors"
+                        >
+                          <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                          {editing ? 'In Progress' : 'In Progress — View'}
                         </button>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">

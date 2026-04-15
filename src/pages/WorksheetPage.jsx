@@ -11,6 +11,8 @@ export default function WorksheetPage() {
   const [cells, setCells] = useState({}) // { "promptIdx_strengthIdx": text }
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -49,15 +51,9 @@ export default function WorksheetPage() {
     setCells(prev => ({ ...prev, [`${promptIdx}_${strengthIdx}`]: value }))
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setSubmitting(true)
-    setError(null)
-
-    const now = new Date().toISOString()
+  function buildRows(submittedAt = null) {
     const prompts = session.prompts ?? []
     const strengths = participant.top5 ?? []
-
     const rows = []
     prompts.forEach((_, pi) => {
       strengths.forEach((_, si) => {
@@ -66,19 +62,35 @@ export default function WorksheetPage() {
           prompt_index: pi,
           strength_index: si,
           response_text: cells[`${pi}_${si}`] ?? '',
-          submitted_at: now,
+          submitted_at: submittedAt,
         })
       })
     })
+    return rows
+  }
 
-    // Upsert responses
+  async function handleSaveDraft() {
+    setSaving(true)
+    setError(null)
     const { error: upsertErr } = await supabase
       .from('responses')
-      .upsert(rows, { onConflict: 'participant_id,prompt_index,strength_index' })
+      .upsert(buildRows(null), { onConflict: 'participant_id,prompt_index,strength_index' })
+    setSaving(false)
+    if (upsertErr) { setError(upsertErr.message); return }
+    setSavedAt(new Date())
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+
+    const { error: upsertErr } = await supabase
+      .from('responses')
+      .upsert(buildRows(new Date().toISOString()), { onConflict: 'participant_id,prompt_index,strength_index' })
 
     if (upsertErr) { setError(upsertErr.message); setSubmitting(false); return }
 
-    // Send confirmation email via Edge Function
     await supabase.functions.invoke('send-worksheet-email', {
       body: { participant_id: participant.id },
     })
@@ -178,17 +190,27 @@ export default function WorksheetPage() {
 
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-          <div className="mt-6 flex items-center gap-4">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || saving}
               className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors"
             >
               {submitting ? 'Submitting…' : 'Submit Worksheet'}
             </button>
-            <p className="text-xs text-gray-400">
-              Once submitted, your responses will be emailed to {participant.email}.
-            </p>
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={saving || submitting}
+              className="bg-white hover:bg-gray-50 disabled:opacity-60 text-gray-700 font-semibold px-6 py-3 rounded-xl text-sm border border-gray-300 transition-colors"
+            >
+              {saving ? 'Saving…' : 'Save & Finish Later'}
+            </button>
+            <div className="text-xs text-gray-400">
+              {savedAt
+                ? <span className="text-green-600">✓ Progress saved at {savedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                : 'Progress is not saved until you click Save or Submit.'}
+            </div>
           </div>
         </form>
       )}
