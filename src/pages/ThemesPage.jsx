@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 
-function ThemeRow({ theme, onSave, onDelete }) {
+function ThemeRow({ theme, creatorName, onSave, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(theme.name)
   const [promptsText, setPromptsText] = useState((theme.prompts ?? []).join('\n'))
@@ -57,9 +57,9 @@ function ThemeRow({ theme, onSave, onDelete }) {
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
                 {prompts.length} prompt{prompts.length !== 1 ? 's' : ''}
               </span>
-              {theme.created_by_email && (
+              {creatorName && (
                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {theme.created_by_email.split('@')[0]}
+                  {creatorName}
                 </span>
               )}
             </div>
@@ -135,6 +135,7 @@ function ThemeRow({ theme, onSave, onDelete }) {
 
 export default function ThemesPage() {
   const [themes, setThemes] = useState([])
+  const [profiles, setProfiles] = useState({}) // { uuid: display_name }
   const [loading, setLoading] = useState(true)
   const [addingNew, setAddingNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -145,8 +146,14 @@ export default function ThemesPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase.from('prompt_themes').select('*').order('name')
-    setThemes(data ?? [])
+    const [{ data: themesData }, { data: profilesData }] = await Promise.all([
+      supabase.from('prompt_themes').select('*').order('name'),
+      supabase.from('profiles').select('id, display_name'),
+    ])
+    setThemes(themesData ?? [])
+    const profileMap = {}
+    ;(profilesData ?? []).forEach(p => { profileMap[p.id] = p.display_name })
+    setProfiles(profileMap)
     setLoading(false)
   }
 
@@ -258,6 +265,7 @@ export default function ThemesPage() {
             <ThemeRow
               key={t.id}
               theme={t}
+              creatorName={profiles[t.created_by] ?? t.created_by_email?.split('@')[0] ?? null}
               onSave={handleSaveEdit}
               onDelete={handleDelete}
             />
