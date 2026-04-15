@@ -53,7 +53,15 @@ function ThemeRow({ theme, onSave, onDelete }) {
           </svg>
           <div>
             <p className="font-semibold text-gray-900">{theme.name}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{prompts.length} prompt{prompts.length !== 1 ? 's' : ''}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-gray-400">{prompts.length} prompt{prompts.length !== 1 ? 's' : ''}</p>
+              {theme.created_by_email && (
+                <>
+                  <span className="text-gray-300 text-xs">·</span>
+                  <p className="text-xs text-gray-400">Created by {theme.created_by_email}</p>
+                </>
+              )}
+            </div>
           </div>
         </button>
         <div className="flex items-center gap-3 ml-4 shrink-0">
@@ -163,6 +171,7 @@ export default function ThemesPage() {
       name: newName.trim(),
       prompts,
       created_by: user.id,
+      created_by_email: user.email,
     })
     setSaving(false)
     if (error) { setSaveError(error.message); return }
