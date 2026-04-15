@@ -48,7 +48,7 @@ export async function downloadWorksheetPDF(participant, session, responses) {
   let logoBottom = 20
   try {
     const { dataUrl, width, height } = await loadImageAsDataUrl('/logo.png')
-    const logoH = 32
+    const logoH = 48
     const logoW = (width / height) * logoH
     doc.addImage(dataUrl, 'PNG', 20, 14, logoW, logoH)
     logoBottom = 14 + logoH + 6

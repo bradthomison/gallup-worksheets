@@ -114,9 +114,9 @@ export default function WorksheetPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="Gallup Strengths" className="h-10 w-auto" />
+            <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
             <p className="text-sm text-gray-400">{session.title}</p>
           </div>
           <p className="text-sm font-medium text-gray-700">{participant.name}</p>
