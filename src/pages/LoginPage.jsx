@@ -28,7 +28,7 @@ export default function LoginPage() {
         {/* Brand header */}
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Gallup Strengths" className="w-full h-auto mb-4" />
-          <p className="text-sm text-gray-500">Coach portal</p>
+          <p className="text-2xl font-bold text-gray-800 w-1/2 mx-auto text-center">Coach Portal</p>
         </div>
 
         <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-5">
