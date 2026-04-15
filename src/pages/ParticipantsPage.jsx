@@ -4,6 +4,7 @@ import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
+import { useAuth } from '../hooks/useAuth'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -92,7 +93,9 @@ function EditRow({ person, onSave, onCancel }) {
 }
 
 export default function ParticipantsPage() {
+  const { user } = useAuth()
   const [people, setPeople] = useState([])
+  const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
   const [addingNew, setAddingNew] = useState(false)
@@ -106,11 +109,14 @@ export default function ParticipantsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const { data } = await supabase
-      .from('people')
-      .select('*')
-      .order('name')
+    const [{ data }, { data: profData }] = await Promise.all([
+      supabase.from('people').select('*').order('name'),
+      supabase.from('profiles').select('id, display_name'),
+    ])
     setPeople(data ?? [])
+    const map = {}
+    ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
+    setProfiles(map)
     setLoading(false)
   }
 
@@ -137,6 +143,11 @@ export default function ParticipantsPage() {
     await supabase.from('people').delete().eq('id', id)
     setDeleteConfirm(null)
     load()
+  }
+
+  async function handleToggleShare(person) {
+    await supabase.from('people').update({ shared: !person.shared }).eq('id', person.id)
+    setPeople(prev => prev.map(p => p.id === person.id ? { ...p, shared: !p.shared } : p))
   }
 
   async function handlePasteSave() {
@@ -274,8 +285,12 @@ export default function ParticipantsPage() {
                   </td>
                 </tr>
               )}
-              {filtered.map(p => (
-                editingId === p.id ? (
+              {filtered.map(p => {
+                const isOwner = p.created_by === user?.id
+                const sharedByName = !isOwner
+                  ? (profiles[p.created_by] ?? 'Another coach')
+                  : null
+                return editingId === p.id ? (
                   <EditRow
                     key={p.id}
                     person={p}
@@ -284,7 +299,14 @@ export default function ParticipantsPage() {
                   />
                 ) : (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">{p.name}</p>
+                      {!isOwner && (
+                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                          Shared by {sharedByName}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{p.email}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
@@ -292,32 +314,49 @@ export default function ParticipantsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {deleteConfirm === p.id ? (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">Delete?</span>
-                          <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes</button>
-                          <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">No</button>
-                        </div>
+                      {isOwner ? (
+                        deleteConfirm === p.id ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Delete?</span>
+                            <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes</button>
+                            <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">No</button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => handleToggleShare(p)}
+                              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                                p.shared
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                              }`}
+                              title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                            >
+                              {p.shared ? 'Shared' : 'Private'}
+                            </button>
+                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => { setEditingId(p.id); setAddingNew(false) }}
+                                className="text-xs text-brand-500 font-medium hover:underline"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(p.id)}
+                                className="text-xs text-red-400 font-medium hover:underline"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )
                       ) : (
-                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={() => { setEditingId(p.id); setAddingNew(false) }}
-                            className="text-xs text-brand-500 font-medium hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(p.id)}
-                            className="text-xs text-red-400 font-medium hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <span className="text-xs text-gray-300">—</span>
                       )}
                     </td>
                   </tr>
                 )
-              ))}
+              })}
             </tbody>
           </table>
         )}

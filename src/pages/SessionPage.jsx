@@ -6,11 +6,14 @@ import StrengthBadge from '../components/StrengthBadge'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
 import { downloadSessionPDFs } from '../lib/downloadWorksheetPDF'
+import { useAuth } from '../hooks/useAuth'
 
 export default function SessionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [session, setSession] = useState(null)
+  const [profiles, setProfiles] = useState({})
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
@@ -42,16 +45,20 @@ export default function SessionPage() {
   }, [id])
 
   async function load() {
-    const [{ data: sess }, { data: parts }] = await Promise.all([
+    const [{ data: sess }, { data: parts }, { data: profData }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', id).single(),
       supabase
         .from('participants')
         .select('id, name, email, top5, worksheet_url_slug, responses(id, submitted_at)')
         .eq('session_id', id)
         .order('name'),
+      supabase.from('profiles').select('id, display_name'),
     ])
     setSession(sess)
     setParticipants(parts ?? [])
+    const map = {}
+    ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
+    setProfiles(map)
     setLoading(false)
   }
 
@@ -164,6 +171,16 @@ export default function SessionPage() {
     load()
   }
 
+  async function handleToggleShare() {
+    const { data: updated } = await supabase
+      .from('sessions')
+      .update({ shared: !session.shared })
+      .eq('id', id)
+      .select()
+      .single()
+    if (updated) setSession(updated)
+  }
+
   async function handleDownloadAll() {
     setBatchDownloading(true)
     setBatchProgress(null)
@@ -215,10 +232,13 @@ export default function SessionPage() {
   if (loading) return <Layout><p className="text-gray-500 text-sm">Loading…</p></Layout>
   if (!session) return <Layout><p className="text-red-500 text-sm">Session not found.</p></Layout>
 
+  const isOwner = session.created_by === user?.id
+  const sharedByName = !isOwner
+    ? (profiles[session.created_by] ?? 'Another coach')
+    : null
+
   const submittedCount = participants.filter(isSubmitted).length
-  const visibleParticipants = editing
-    ? participants // show all with remove buttons
-    : participants
+  const visibleParticipants = participants
 
   return (
     <Layout>
@@ -235,8 +255,17 @@ export default function SessionPage() {
         <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← All sessions</Link>
       </div>
 
+      {/* Shared-by banner for non-owners */}
+      {!isOwner && (
+        <div className="mt-3 mb-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+          <span className="text-xs text-gray-500">
+            Shared by <span className="font-medium text-gray-700">{sharedByName}</span> — view only
+          </span>
+        </div>
+      )}
+
       {/* Header */}
-      <div className="flex items-start justify-between mt-3 mb-6">
+      <div className={`flex items-start justify-between ${isOwner ? 'mt-3' : ''} mb-6`}>
         <div>
           {editing ? (
             <div className="space-y-2">
@@ -270,6 +299,22 @@ export default function SessionPage() {
           </div>
           {!editing && (
             <>
+              {/* Share toggle — owner only */}
+              {isOwner && (
+                <button
+                  onClick={handleToggleShare}
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                    session.shared
+                      ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                      : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                  }`}
+                  title={session.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                >
+                  {session.shared ? '🌐 Shared' : '🔒 Private'}
+                </button>
+              )}
+
+              {/* Download PDFs — visible to all */}
               {batchDownloading ? (
                 <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[200px]">
                   <p className="font-medium text-gray-700 mb-0.5">Generating PDFs…</p>
@@ -289,36 +334,42 @@ export default function SessionPage() {
                   ↓ Download all PDFs
                 </button>
               )}
-              <button
-                onClick={startEditing}
-                className="text-xs text-gray-400 hover:text-brand-500 transition-colors font-medium"
-              >
-                Edit session
-              </button>
-              {confirmDelete ? (
-                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  <span className="text-xs text-red-700 font-medium">Delete this session?</span>
+
+              {/* Edit / Delete — owner only */}
+              {isOwner && (
+                <>
                   <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition-colors disabled:opacity-60"
+                    onClick={startEditing}
+                    className="text-xs text-gray-400 hover:text-brand-500 transition-colors font-medium"
                   >
-                    {deleting ? 'Deleting…' : 'Yes, delete'}
+                    Edit session
                   </button>
-                  <button
-                    onClick={() => setConfirmDelete(false)}
-                    className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium"
-                >
-                  Delete session
-                </button>
+                  {confirmDelete ? (
+                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                      <span className="text-xs text-red-700 font-medium">Delete this session?</span>
+                      <button
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition-colors disabled:opacity-60"
+                      >
+                        {deleting ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(false)}
+                        className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium"
+                    >
+                      Delete session
+                    </button>
+                  )}
+                </>
               )}
             </>
           )}
@@ -441,8 +492,8 @@ export default function SessionPage() {
         )}
       </div>
 
-      {/* Add participants panel — only in edit mode */}
-      {editing && (
+      {/* Add participants panel — only in edit mode (owner only) */}
+      {editing && isOwner && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">
