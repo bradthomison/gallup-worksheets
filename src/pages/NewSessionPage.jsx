@@ -11,6 +11,10 @@ export default function NewSessionPage() {
   const [date, setDate] = useState('')
   const [promptsText, setPromptsText] = useState('')
 
+  // Theme picker
+  const [themes, setThemes] = useState([])
+  const [selectedTheme, setSelectedTheme] = useState('')
+
   // Participant picker
   const [tab, setTab] = useState('existing') // 'existing' | 'paste'
   const [people, setPeople] = useState([])
@@ -26,7 +30,16 @@ export default function NewSessionPage() {
 
   useEffect(() => {
     supabase.from('people').select('*').order('name').then(({ data }) => setPeople(data ?? []))
+    supabase.from('prompt_themes').select('*').order('name').then(({ data }) => setThemes(data ?? []))
   }, [])
+
+  function handleThemeChange(e) {
+    const id = e.target.value
+    setSelectedTheme(id)
+    if (!id) return
+    const theme = themes.find(t => t.id === id)
+    if (theme) setPromptsText((theme.prompts ?? []).join('\n'))
+  }
 
   function toggleSelect(id) {
     setSelected(prev => {
@@ -137,13 +150,30 @@ export default function NewSessionPage() {
 
           {/* Prompts */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
-            <div>
-              <h2 className="font-semibold text-gray-900">Prompts</h2>
-              <p className="text-sm text-gray-500 mt-0.5">One prompt per line — these become the row headers in the worksheet grid.</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-gray-900">Prompts</h2>
+                <p className="text-sm text-gray-500 mt-0.5">One prompt per line — these become the row headers in the worksheet grid.</p>
+              </div>
+              {themes.length > 0 && (
+                <div className="shrink-0">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Load from theme</label>
+                  <select
+                    value={selectedTheme}
+                    onChange={handleThemeChange}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                  >
+                    <option value="">Choose a theme…</option>
+                    {themes.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.prompts?.length ?? 0})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <textarea
               value={promptsText}
-              onChange={e => setPromptsText(e.target.value)}
+              onChange={e => { setPromptsText(e.target.value); setSelectedTheme('') }}
               rows={6}
               placeholder={"How does this strength show up for you at work?\nWhat's one way you could lean into this strength more?\nWhere do you see this strength creating value for your team?"}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"

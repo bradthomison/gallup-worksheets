@@ -24,6 +24,9 @@ export default function Layout({ children }) {
             <Link to="/participants" className="text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors">
               Participants
             </Link>
+            <Link to="/themes" className="text-sm text-gray-500 hover:text-gray-800 font-medium transition-colors">
+              Themes
+            </Link>
             <Link to="/sessions/new" className="text-sm bg-brand-500 hover:bg-brand-600 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
               + New Session
             </Link>
