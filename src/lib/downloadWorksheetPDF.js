@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import JSZip from 'jszip'
 import { getStrengthColors } from './strengthColors'
 
 function hexToRgb(hex) {
@@ -25,7 +26,17 @@ async function loadImageAsDataUrl(src) {
   })
 }
 
-export async function downloadWorksheetPDF(participant, session, responses) {
+// Cache the logo so batch downloads don't reload it for every PDF
+let logoCache = null
+async function getLogo() {
+  if (!logoCache) {
+    try { logoCache = await loadImageAsDataUrl('/logo.png') } catch { logoCache = null }
+  }
+  return logoCache
+}
+
+// Core PDF builder — returns a jsPDF blob
+async function buildWorksheetPDF(participant, session, responses) {
   const prompts = session.prompts ?? []
   const strengths = participant.top5 ?? []
 
@@ -43,16 +54,15 @@ export async function downloadWorksheetPDF(participant, session, responses) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' })
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  // ── Header ──────────────────────────────────────────────────────────────────
-  // Try to embed the logo; fall back to text if it fails
+  // ── Header ────────────────────────────────────────────────────────────────
   let logoBottom = 20
-  try {
-    const { dataUrl, width, height } = await loadImageAsDataUrl('/logo.png')
+  const logo = await getLogo()
+  if (logo) {
     const logoH = 48
-    const logoW = (width / height) * logoH
-    doc.addImage(dataUrl, 'PNG', 20, 14, logoW, logoH)
+    const logoW = (logo.width / logo.height) * logoH
+    doc.addImage(logo.dataUrl, 'PNG', 20, 14, logoW, logoH)
     logoBottom = 14 + logoH + 6
-  } catch {
+  } else {
     doc.setFontSize(14)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(30, 30, 30)
@@ -60,11 +70,9 @@ export async function downloadWorksheetPDF(participant, session, responses) {
     logoBottom = 38
   }
 
-  // Divider
   doc.setDrawColor(220, 220, 220)
   doc.line(20, logoBottom, pageWidth - 20, logoBottom)
 
-  // Session title + participant info
   const infoY = logoBottom + 14
   doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
@@ -84,76 +92,35 @@ export async function downloadWorksheetPDF(participant, session, responses) {
     doc.text('In Progress', pageWidth - 20, infoY + 14, { align: 'right' })
   }
 
-  const tableStartY = infoY + 28
-
-  // ── Table ────────────────────────────────────────────────────────────────────
-  const head = [['', ...strengths]]
-  const body = prompts.map((prompt, pi) => [
-    prompt,
-    ...strengths.map((_, si) => cellMap[`${pi}_${si}`] ?? ''),
-  ])
-
-  // Pre-compute header colors
+  // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
   autoTable(doc, {
-    head,
-    body,
-    startY: tableStartY,
+    head: [['', ...strengths]],
+    body: prompts.map((prompt, pi) => [
+      prompt,
+      ...strengths.map((_, si) => cellMap[`${pi}_${si}`] ?? ''),
+    ]),
+    startY: infoY + 28,
     margin: { left: 20, right: 20 },
-    styles: {
-      fontSize: 9,
-      cellPadding: 6,
-      valign: 'top',
-      overflow: 'linebreak',
-      lineColor: [220, 220, 220],
-      lineWidth: 0.5,
-    },
-    headStyles: {
-      fillColor: [59, 91, 219], // default, overridden per cell below
-      textColor: [255, 255, 255],
-      fontStyle: 'bold',
-      fontSize: 10,
-      halign: 'center',
-      cellPadding: 8,
-    },
-    columnStyles: {
-      0: {
-        cellWidth: 130,
-        fontStyle: 'bold',
-        fillColor: [248, 249, 250],
-        textColor: [50, 50, 50],
-        fontSize: 9,
-      },
-    },
-    bodyStyles: {
-      textColor: [40, 40, 40],
-      fillColor: [255, 255, 255],
-    },
-    alternateRowStyles: {
-      fillColor: [252, 252, 253],
-    },
+    styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
+    columnStyles: { 0: { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 } },
+    bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
+    alternateRowStyles: { fillColor: [252, 252, 253] },
     didParseCell(data) {
       if (data.section === 'head') {
-        if (data.column.index === 0) {
-          // Top-left corner — no fill
-          data.cell.styles.fillColor = [255, 255, 255]
-        } else {
-          // Color each strength column header with its domain color
-          const color = headerColors[data.column.index - 1]
-          if (color) data.cell.styles.fillColor = color
-        }
+        data.cell.styles.fillColor = data.column.index === 0
+          ? [255, 255, 255]
+          : (headerColors[data.column.index - 1] ?? [59, 91, 219])
       }
     },
-    // Wrap long cell text
     willDrawCell(data) {
-      if (data.section === 'body' && data.column.index > 0) {
-        data.cell.styles.minCellHeight = 50
-      }
+      if (data.section === 'body' && data.column.index > 0) data.cell.styles.minCellHeight = 50
     },
   })
 
-  // ── Footer ───────────────────────────────────────────────────────────────────
+  // ── Footer ─────────────────────────────────────────────────────────────────
   const pageCount = doc.internal.getNumberOfPages()
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
@@ -168,7 +135,43 @@ export async function downloadWorksheetPDF(participant, session, responses) {
     )
   }
 
-  const filename = `${participant.name} - ${session.title}.pdf`
-    .replace(/[/\\?%*:|"<>]/g, '-')
-  doc.save(filename)
+  return doc.output('blob')
+}
+
+function safeName(str) {
+  return str.replace(/[/\\?%*:|"<>]/g, '-')
+}
+
+// Single download
+export async function downloadWorksheetPDF(participant, session, responses) {
+  const blob = await buildWorksheetPDF(participant, session, responses)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = safeName(`${participant.name} - ${session.title}.pdf`)
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// Batch download — all participants with any responses, bundled as a ZIP
+export async function downloadSessionPDFs(session, participants, fetchResponses, onProgress) {
+  logoCache = null // reset so we get a fresh load
+  const zip = new JSZip()
+  const eligible = participants.filter(p => p.responses?.length > 0)
+
+  for (let i = 0; i < eligible.length; i++) {
+    const participant = eligible[i]
+    onProgress?.({ current: i + 1, total: eligible.length, name: participant.name })
+    const responses = await fetchResponses(participant.id)
+    const blob = await buildWorksheetPDF(participant, session, responses)
+    zip.file(safeName(`${participant.name}.pdf`), blob)
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' })
+  const url = URL.createObjectURL(zipBlob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = safeName(`${session.title} - Worksheets.zip`)
+  a.click()
+  URL.revokeObjectURL(url)
 }

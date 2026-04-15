@@ -5,6 +5,7 @@ import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
+import { downloadSessionPDFs } from '../lib/downloadWorksheetPDF'
 
 export default function SessionPage() {
   const { id } = useParams()
@@ -16,6 +17,8 @@ export default function SessionPage() {
   const [viewing, setViewing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [batchDownloading, setBatchDownloading] = useState(false)
+  const [batchProgress, setBatchProgress] = useState(null)
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -161,6 +164,22 @@ export default function SessionPage() {
     load()
   }
 
+  async function handleDownloadAll() {
+    setBatchDownloading(true)
+    setBatchProgress(null)
+    await downloadSessionPDFs(
+      session,
+      participants,
+      async (participantId) => {
+        const { data } = await supabase.from('responses').select('*').eq('participant_id', participantId)
+        return data ?? []
+      },
+      (progress) => setBatchProgress(progress)
+    )
+    setBatchDownloading(false)
+    setBatchProgress(null)
+  }
+
   function worksheetUrl(slug) {
     return `${window.location.origin}/worksheet/${slug}`
   }
@@ -251,6 +270,25 @@ export default function SessionPage() {
           </div>
           {!editing && (
             <>
+              {batchDownloading ? (
+                <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[200px]">
+                  <p className="font-medium text-gray-700 mb-0.5">Generating PDFs…</p>
+                  {batchProgress && (
+                    <p className="text-gray-500">
+                      {batchProgress.current} of {batchProgress.total}: {batchProgress.name}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={handleDownloadAll}
+                  disabled={participants.filter(p => p.responses?.length > 0).length === 0}
+                  className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                  title="Download all worksheets as a ZIP"
+                >
+                  ↓ Download all PDFs
+                </button>
+              )}
               <button
                 onClick={startEditing}
                 className="text-xs text-gray-400 hover:text-brand-500 transition-colors font-medium"
