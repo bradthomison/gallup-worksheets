@@ -9,7 +9,23 @@ function hexToRgb(hex) {
   return [r, g, b]
 }
 
-export function downloadWorksheetPDF(participant, session, responses) {
+async function loadImageAsDataUrl(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      canvas.getContext('2d').drawImage(img, 0, 0)
+      resolve({ dataUrl: canvas.toDataURL('image/png'), width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+export async function downloadWorksheetPDF(participant, session, responses) {
   const prompts = session.prompts ?? []
   const strengths = participant.top5 ?? []
 
@@ -28,36 +44,47 @@ export function downloadWorksheetPDF(participant, session, responses) {
   const pageWidth = doc.internal.pageSize.getWidth()
 
   // ── Header ──────────────────────────────────────────────────────────────────
-  // Brand bar
-  doc.setFillColor(59, 91, 219)
-  doc.rect(0, 0, pageWidth, 40, 'F')
+  // Try to embed the logo; fall back to text if it fails
+  let logoBottom = 20
+  try {
+    const { dataUrl, width, height } = await loadImageAsDataUrl('/logo.png')
+    const logoH = 32
+    const logoW = (width / height) * logoH
+    doc.addImage(dataUrl, 'PNG', 20, 14, logoW, logoH)
+    logoBottom = 14 + logoH + 6
+  } catch {
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text('Gallup Strengths', 20, 30)
+    logoBottom = 38
+  }
 
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.text('GALLUP STRENGTHS', 20, 15)
+  // Divider
+  doc.setDrawColor(220, 220, 220)
+  doc.line(20, logoBottom, pageWidth - 20, logoBottom)
 
-  doc.setFontSize(16)
+  // Session title + participant info
+  const infoY = logoBottom + 14
+  doc.setFontSize(13)
   doc.setFont('helvetica', 'bold')
-  doc.text(session.title, 20, 31)
-
-  // Participant info
   doc.setTextColor(30, 30, 30)
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'bold')
-  doc.text(participant.name, 20, 58)
+  doc.text(session.title, 20, infoY)
 
+  doc.setFontSize(10)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(100, 100, 100)
-  doc.text(participant.email, 20, 70)
+  doc.setTextColor(80, 80, 80)
+  doc.text(`${participant.name} · ${participant.email}`, 20, infoY + 14)
 
   if (submittedAt) {
-    doc.text(`Submitted ${submittedAt}`, pageWidth - 20, 70, { align: 'right' })
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Submitted ${submittedAt}`, pageWidth - 20, infoY + 14, { align: 'right' })
   } else {
     doc.setTextColor(180, 120, 0)
-    doc.text('In Progress', pageWidth - 20, 70, { align: 'right' })
+    doc.text('In Progress', pageWidth - 20, infoY + 14, { align: 'right' })
   }
+
+  const tableStartY = infoY + 28
 
   // ── Table ────────────────────────────────────────────────────────────────────
   const head = [['Prompt', ...strengths]]
@@ -72,7 +99,7 @@ export function downloadWorksheetPDF(participant, session, responses) {
   autoTable(doc, {
     head,
     body,
-    startY: 82,
+    startY: tableStartY,
     margin: { left: 20, right: 20 },
     styles: {
       fontSize: 9,
