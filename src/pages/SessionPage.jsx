@@ -171,6 +171,28 @@ export default function SessionPage() {
     load()
   }
 
+  function downloadParticipantCSV() {
+    const rows = [
+      ['Name', 'Email', 'Top 5 Strengths', 'Worksheet URL'],
+      ...participants.map(p => [
+        p.name,
+        p.email,
+        (p.top5 ?? []).join(', '),
+        worksheetUrl(p.worksheet_url_slug),
+      ]),
+    ]
+    const csv = rows
+      .map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${session.title} - Participants.csv`.replace(/[/\\?%*:|"<>]/g, '-')
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   async function handleToggleShare() {
     const { data: updated } = await supabase
       .from('sessions')
@@ -334,6 +356,16 @@ export default function SessionPage() {
                   ↓ Download all PDFs
                 </button>
               )}
+
+              {/* CSV export — visible to all */}
+              <button
+                onClick={downloadParticipantCSV}
+                disabled={participants.length === 0}
+                className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                title="Download participant list with worksheet links"
+              >
+                ↓ Download CSV
+              </button>
 
               {/* Edit / Delete — owner only */}
               {isOwner && (
