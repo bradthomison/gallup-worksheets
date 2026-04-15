@@ -152,14 +152,20 @@ export default function WorksheetPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="w-48 min-w-[180px] px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">
+                  <th className="w-48 min-w-[180px] px-4 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-r border-gray-200">
                     Prompt
                   </th>
                   {strengths.map((s, si) => {
                     const colors = getStrengthColors(s)
                     return (
-                      <th key={si} style={{ background: colors.bg, borderColor: '#e5e7eb' }} className="px-4 py-3 text-center border-b border-r last:border-r-0">
-                        <StrengthBadge name={s} size="sm" />
+                      <th
+                        key={si}
+                        style={{ background: colors.headerBg, borderColor: 'rgba(255,255,255,0.2)' }}
+                        className="px-4 py-4 text-center border-b border-r last:border-r-0"
+                      >
+                        <span style={{ color: colors.headerText, fontSize: '13px', fontWeight: 700, letterSpacing: '0.02em' }}>
+                          {s}
+                        </span>
                       </th>
                     )
                   })}
@@ -168,7 +174,7 @@ export default function WorksheetPage() {
               <tbody>
                 {prompts.map((prompt, pi) => (
                   <tr key={pi} className="border-b border-gray-100 last:border-b-0">
-                    <td className="px-4 py-3 align-top font-medium text-gray-700 border-r border-gray-200 bg-gray-50 text-xs leading-relaxed">
+                    <td className="px-4 py-4 align-top font-medium text-gray-700 border-r border-gray-200 bg-gray-50 text-sm leading-relaxed">
                       {pi + 1}. {prompt}
                     </td>
                     {strengths.map((_, si) => (
