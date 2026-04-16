@@ -194,13 +194,12 @@ export default function WorksheetPage() {
                       {pi + 1}. {prompt}
                     </td>
                     {strengths.map((_, si) => (
-                      <td key={si} className="border-r border-gray-100 last:border-r-0 p-0 align-top">
+                      <td key={si} className="border-r border-gray-100 last:border-r-0 p-0 h-px">
                         <textarea
                           value={cells[`${pi}_${si}`] ?? ''}
                           onChange={e => handleCellChange(pi, si, e.target.value)}
-                          rows={3}
                           placeholder="Your thoughts…"
-                          className="w-full h-full min-h-[80px] px-3 py-2 text-sm text-gray-700 resize-none border-0 focus:outline-none focus:bg-brand-50 transition-colors placeholder-gray-300"
+                          className="w-full h-full min-h-[100px] px-3 py-2 text-sm text-gray-700 resize-none border-0 focus:outline-none focus:bg-brand-50 transition-colors placeholder-gray-300"
                         />
                       </td>
                     ))}
