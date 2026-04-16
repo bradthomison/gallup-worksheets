@@ -325,31 +325,35 @@ export default function ParticipantsPage() {
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => navigate('/teams')}
-            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            Edit Teams
-          </button>
-          <button
-            onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
-            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + Paste Multiple
-          </button>
-          <button
-            onClick={() => openAddTeamModal(null)}
-            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + Add Team
-          </button>
-          <button
-            onClick={() => { setAddingNew(true); setAddMode('single'); setEditingId(null) }}
-            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            + Add Person
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
+              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + Paste Multiple
+            </button>
+            <button
+              onClick={() => { setAddingNew(true); setAddMode('single'); setEditingId(null) }}
+              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + Add Person
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate('/teams')}
+              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Edit Teams
+            </button>
+            <button
+              onClick={() => openAddTeamModal(null)}
+              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              + Add Team
+            </button>
+          </div>
         </div>
       </div>
 
@@ -487,7 +491,7 @@ export default function ParticipantsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {isOwner ? (
+                      {(isOwner || p.shared) ? (
                         deleteConfirm === p.id ? (
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-500">Delete?</span>
@@ -496,17 +500,19 @@ export default function ParticipantsPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => handleToggleShare(p)}
-                              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
-                                p.shared
-                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
-                              }`}
-                              title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
-                            >
-                              {p.shared ? 'Shared' : 'Private'}
-                            </button>
+                            {isOwner && (
+                              <button
+                                onClick={() => handleToggleShare(p)}
+                                className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                                  p.shared
+                                    ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                    : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                                }`}
+                                title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                              >
+                                {p.shared ? 'Shared' : 'Private'}
+                              </button>
+                            )}
                             <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => { setEditingId(p.id); setAddingNew(false) }}

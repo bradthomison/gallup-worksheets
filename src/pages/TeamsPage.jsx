@@ -150,6 +150,7 @@ export default function TeamsPage() {
   const { user } = useAuth()
   const [teams, setTeams] = useState([])
   const [people, setPeople] = useState([])
+  const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null) // team id | 'new' | null
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -158,12 +159,16 @@ export default function TeamsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data: teamsData }, { data: peopleData }] = await Promise.all([
+    const [{ data: teamsData }, { data: peopleData }, { data: profData }] = await Promise.all([
       supabase.from('teams').select('*').order('name'),
       supabase.from('people').select('id, name, email, top5, team_id').order('name'),
+      supabase.from('profiles').select('id, display_name'),
     ])
     setTeams(teamsData ?? [])
     setPeople(peopleData ?? [])
+    const map = {}
+    ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
+    setProfiles(map)
     setLoading(false)
   }
 
@@ -171,19 +176,18 @@ export default function TeamsPage() {
     const { data: { user: u } } = await supabase.auth.getUser()
     if (id) {
       await supabase.from('teams').update(form).eq('id', id)
+      await load()
+      setEditingId(null)
     } else {
       const { data: newTeam } = await supabase
         .from('teams')
         .insert({ ...form, created_by: u.id })
         .select()
         .single()
-      // Auto-open the new team for member management
       await load()
+      // Auto-open the new team for member management
       setEditingId(newTeam?.id ?? null)
-      return
     }
-    await load()
-    setEditingId(null)
   }
 
   async function handleDeleteTeam(id) {
@@ -191,6 +195,11 @@ export default function TeamsPage() {
     setDeleteConfirm(null)
     if (editingId === id) setEditingId(null)
     load()
+  }
+
+  async function handleToggleShare(team) {
+    await supabase.from('teams').update({ shared: !team.shared }).eq('id', team.id)
+    setTeams(prev => prev.map(t => t.id === team.id ? { ...t, shared: !t.shared } : t))
   }
 
   async function handleMemberAdd(personId, teamId) {
@@ -214,7 +223,7 @@ export default function TeamsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Teams</h1>
         <button
-          onClick={() => { setEditingId('new'); }}
+          onClick={() => setEditingId('new')}
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           + Add Team
@@ -273,10 +282,21 @@ export default function TeamsPage() {
               {filtered.map(team => {
                 const memberCount = people.filter(p => p.team_id === team.id).length
                 const isOwner = team.created_by === user?.id
+                const canEdit = isOwner || team.shared
+                const sharedByName = !isOwner
+                  ? (profiles[team.created_by] ?? 'Another coach')
+                  : null
                 return (
                   <>
                     <tr key={team.id} className="hover:bg-gray-50 transition-colors group">
-                      <td className="px-4 py-3 font-medium text-gray-900">{team.name}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{team.name}</p>
+                        {!isOwner && (
+                          <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                            Shared by {sharedByName}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-gray-500">{team.location || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-500">{team.primary_coach || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3">
@@ -285,7 +305,7 @@ export default function TeamsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {isOwner ? (
+                        {canEdit ? (
                           deleteConfirm === team.id ? (
                             <div className="flex items-center gap-2">
                               <span className="text-xs text-gray-500">Delete team?</span>
@@ -293,19 +313,34 @@ export default function TeamsPage() {
                               <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">No</button>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => setEditingId(editingId === team.id ? null : team.id)}
-                                className="text-xs text-brand-500 font-medium hover:underline"
-                              >
-                                {editingId === team.id ? 'Close' : 'Edit'}
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(team.id)}
-                                className="text-xs text-red-400 font-medium hover:underline"
-                              >
-                                Delete
-                              </button>
+                            <div className="flex items-center gap-3">
+                              {isOwner && (
+                                <button
+                                  onClick={() => handleToggleShare(team)}
+                                  className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                                    team.shared
+                                      ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                      : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                                  }`}
+                                  title={team.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                                >
+                                  {team.shared ? 'Shared' : 'Private'}
+                                </button>
+                              )}
+                              <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => setEditingId(editingId === team.id ? null : team.id)}
+                                  className="text-xs text-brand-500 font-medium hover:underline"
+                                >
+                                  {editingId === team.id ? 'Close' : 'Edit'}
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(team.id)}
+                                  className="text-xs text-red-400 font-medium hover:underline"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </div>
                           )
                         ) : (
