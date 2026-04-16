@@ -12,9 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json()
-    console.log('REQUEST BODY:', JSON.stringify(body))
-    const { session_id, app_origin, participant_ids } = body
+    const { session_id, app_origin, participant_ids } = await req.json()
     if (!session_id || !app_origin) throw new Error('session_id and app_origin are required')
 
     const supabase = createClient(
@@ -28,7 +26,6 @@ serve(async (req) => {
       .select('*')
       .eq('id', session_id)
       .single()
-    console.log('SESSION FETCH:', session ? `ok (${session.id})` : `error: ${sessErr?.message}`)
     if (sessErr || !session) throw new Error('Session not found')
 
     // Fetch coach display name
@@ -50,17 +47,12 @@ serve(async (req) => {
         ? baseQuery.in('id', participant_ids)
         : baseQuery
     )
-    console.log('session_id:', session_id)
-    console.log('participants fetched:', participants?.length ?? 0, partErr ? `error: ${partErr.message}` : 'ok')
-
     const resendKey = Deno.env.get('RESEND_API_KEY')
-    console.log('resend key present:', !!resendKey)
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
     const fromAddress = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
 
     let sent = 0
     for (const p of participants ?? []) {
-      console.log('sending to:', p.email)
       const worksheetUrl = `${app_origin}/worksheet/${p.worksheet_url_slug}`
       const firstName = p.name.split(' ')[0]
 
@@ -116,7 +108,6 @@ serve(async (req) => {
         }),
       })
 
-      console.log('resend status:', res.status, await res.text())
       if (res.ok) sent++
     }
 
