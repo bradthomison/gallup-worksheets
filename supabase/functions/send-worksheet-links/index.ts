@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id, app_origin } = await req.json()
+    const { session_id, app_origin, participant_ids } = await req.json()
     if (!session_id || !app_origin) throw new Error('session_id and app_origin are required')
 
     const supabase = createClient(
@@ -28,22 +28,37 @@ serve(async (req) => {
       .single()
     if (sessErr || !session) throw new Error('Session not found')
 
-    // Fetch all participants
-    const { data: participants } = await supabase
+    // Fetch coach display name
+    const { data: coachProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.created_by)
+      .single()
+    const coachName = coachProfile?.display_name ?? null
+
+    // Fetch participants — optionally filtered to a specific subset
+    let query = supabase
       .from('participants')
       .select('id, name, email, worksheet_url_slug')
       .eq('session_id', session_id)
       .order('name')
+    if (Array.isArray(participant_ids) && participant_ids.length > 0) {
+      query = query.in('id', participant_ids)
+    }
+    const { data: participants } = await query
 
     const resendKey = Deno.env.get('RESEND_API_KEY')
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
     const fromAddress = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
-    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
     let sent = 0
     for (const p of participants ?? []) {
       const worksheetUrl = `${app_origin}/worksheet/${p.worksheet_url_slug}`
       const firstName = p.name.split(' ')[0]
+
+      const coachLine = coachName
+        ? `Sent by your Gallup Strengths coach <strong>${coachName}</strong>`
+        : `Sent by your Gallup Strengths coach`
 
       const html = `
 <!DOCTYPE html>
@@ -58,8 +73,8 @@ serve(async (req) => {
     </div>
     <!-- Body -->
     <div style="padding:32px;">
-      <p style="margin:0;font-size:15px;color:#374151;">Hi ${firstName},</p>
-      <p style="margin:12px 0 24px;font-size:14px;color:#6b7280;line-height:1.6;">
+      <p style="margin:0;font-size:15px;color:#111827;">Hi ${firstName},</p>
+      <p style="margin:12px 0 24px;font-size:14px;color:#111827;line-height:1.6;">
         Your coach has prepared a Gallup Strengths worksheet for you. Click the button below to open your personal worksheet and share your reflections.
       </p>
       <!-- CTA Button -->
@@ -69,14 +84,14 @@ serve(async (req) => {
           Open My Worksheet →
         </a>
       </div>
-      <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;text-align:center;line-height:1.6;">
+      <p style="margin:24px 0 0;font-size:12px;color:#111827;text-align:center;line-height:1.6;">
         This link is personal to you — please don't share it.<br/>
         ${session.date ? `Session date: ${new Date(session.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}
       </p>
     </div>
     <!-- Footer -->
     <div style="padding:16px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">Sent by your Gallup Strengths coach · ${dateStr}</p>
+      <p style="margin:0;font-size:12px;color:#111827;">${coachLine}</p>
     </div>
   </div>
 </body>

@@ -148,16 +148,19 @@ export default function WorksheetPage() {
 
           {/* Grid */}
           <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm border-collapse table-fixed">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="w-48 min-w-[180px] px-4 py-4 border-b border-r border-gray-200 bg-gray-50"></th>
+                  <th
+                    style={{ width: `${100 / (strengths.length + 1)}%` }}
+                    className="px-4 py-4 border-b border-r border-gray-200 bg-gray-50"
+                  ></th>
                   {strengths.map((s, si) => {
                     const colors = getStrengthColors(s)
                     return (
                       <th
                         key={si}
-                        style={{ background: colors.headerBg, borderColor: 'rgba(255,255,255,0.2)' }}
+                        style={{ background: colors.headerBg, borderColor: 'rgba(255,255,255,0.2)', width: `${100 / (strengths.length + 1)}%` }}
                         className="px-4 py-4 text-center border-b border-r last:border-r-0"
                       >
                         <span style={{ color: colors.headerText, fontSize: '13px', fontWeight: 700, letterSpacing: '0.02em' }}>
