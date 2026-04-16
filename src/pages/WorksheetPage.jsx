@@ -163,7 +163,7 @@ export default function WorksheetPage() {
           </div>
 
           {/* Grid */}
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
+          <div className="rounded-2xl border border-gray-200 bg-white">
             <table className="w-full text-sm border-collapse table-fixed">
               <thead>
                 <tr className="bg-gray-50">
@@ -194,12 +194,14 @@ export default function WorksheetPage() {
                       {pi + 1}. {prompt}
                     </td>
                     {strengths.map((_, si) => (
-                      <td key={si} className="border-r border-gray-100 last:border-r-0 p-0 h-px">
+                      <td key={si} className="border-r border-gray-100 last:border-r-0 p-0">
                         <textarea
                           value={cells[`${pi}_${si}`] ?? ''}
                           onChange={e => handleCellChange(pi, si, e.target.value)}
                           placeholder="Your thoughts…"
-                          className="w-full h-full min-h-[100px] px-3 py-2 text-sm text-gray-700 resize-none border-0 focus:outline-none focus:bg-brand-50 transition-colors placeholder-gray-300"
+                          style={{ display: 'block', width: '100%', minHeight: '120px', height: '100%', resize: 'none', border: 'none', outline: 'none', padding: '10px 12px', fontSize: '13px', color: '#374151', lineHeight: '1.5', backgroundColor: 'transparent', overflow: 'hidden' }}
+                          onFocus={e => e.target.style.backgroundColor = '#eff6ff'}
+                          onBlur={e => e.target.style.backgroundColor = 'transparent'}
                         />
                       </td>
                     ))}
