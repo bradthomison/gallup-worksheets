@@ -46,6 +46,9 @@ export default function Layout({ children }) {
             <Link to="/participants" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Participants
             </Link>
+            <Link to="/teams" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
+              Teams
+            </Link>
             <Link to="/themes" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Themes
             </Link>

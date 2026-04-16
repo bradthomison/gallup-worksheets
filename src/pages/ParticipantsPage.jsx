@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
@@ -8,16 +9,99 @@ import { useAuth } from '../hooks/useAuth'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
-const BLANK = { name: '', email: '', top5: ['', '', '', '', ''] }
+const BLANK = { name: '', email: '', top5: ['', '', '', '', ''], team_id: '' }
 
-function EditRow({ person, onSave, onCancel }) {
+// ── Add-Team modal ────────────────────────────────────────────────────────────
+function AddTeamModal({ onSave, onClose }) {
+  const [form, setForm] = useState({ name: '', location: '', primary_coach: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSave() {
+    if (!form.name.trim()) { setError('Team name is required'); return }
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: team, error: err } = await supabase
+      .from('teams')
+      .insert({ ...form, created_by: user.id })
+      .select()
+      .single()
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSave(team)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl space-y-4">
+        <h2 className="text-lg font-bold text-gray-900">Add Team</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Team Name *</label>
+            <input
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose() }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="e.g. Alpha Team"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Location</label>
+            <input
+              value={form.location}
+              onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="e.g. Chicago"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Primary Coach</label>
+            <input
+              value={form.primary_coach}
+              onChange={e => setForm(f => ({ ...f, primary_coach: e.target.value }))}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder="Coach name"
+            />
+          </div>
+        </div>
+        {error && <p className="text-xs text-red-500">{error}</p>}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
+          >
+            {saving ? 'Creating…' : 'Create Team'}
+          </button>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit / Add row ────────────────────────────────────────────────────────────
+function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
   const [form, setForm] = useState({
     name: person.name,
     email: person.email,
     top5: [...(person.top5 ?? ['', '', '', '', ''])],
+    team_id: person.team_id ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+
+  // When a new team is created externally, accept it
+  function applyNewTeam(team) {
+    setForm(f => ({ ...f, team_id: team.id }))
+  }
 
   function setStrength(i, val) {
     const t = [...form.top5]
@@ -31,8 +115,20 @@ function EditRow({ person, onSave, onCancel }) {
     if (form.top5.some(s => !s.trim())) { setError('All 5 strengths required'); return }
     setSaving(true)
     setError(null)
-    await onSave({ ...form, top5: form.top5.map(s => s.trim()) })
+    await onSave({
+      ...form,
+      top5: form.top5.map(s => s.trim()),
+      team_id: form.team_id || null,
+    })
     setSaving(false)
+  }
+
+  function handleTeamChange(e) {
+    if (e.target.value === '__new__') {
+      onOpenAddTeam(applyNewTeam)
+    } else {
+      setForm(f => ({ ...f, team_id: e.target.value }))
+    }
   }
 
   return (
@@ -71,6 +167,19 @@ function EditRow({ person, onSave, onCancel }) {
         </div>
         {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       </td>
+      <td className="px-4 py-2">
+        <select
+          value={form.team_id}
+          onChange={handleTeamChange}
+          className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+        >
+          <option value="">No team</option>
+          {teams.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+          <option value="__new__">+ Create new team…</option>
+        </select>
+      </td>
       <td className="px-4 py-2 whitespace-nowrap">
         <div className="flex gap-2">
           <button
@@ -92,9 +201,12 @@ function EditRow({ person, onSave, onCancel }) {
   )
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ParticipantsPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [people, setPeople] = useState([])
+  const [teams, setTeams] = useState([])
   const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
@@ -105,22 +217,27 @@ export default function ParticipantsPage() {
   const [pasteSaving, setPasteSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [saveError, setSaveError] = useState(null)
+
+  // Add Team modal
+  const [addTeamModal, setAddTeamModal] = useState(false)
+  const [addTeamCallback, setAddTeamCallback] = useState(null) // fn(team) to call after create
 
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data }, { data: profData }] = await Promise.all([
+    const [{ data }, { data: profData }, { data: teamsData }] = await Promise.all([
       supabase.from('people').select('*').order('name'),
       supabase.from('profiles').select('id, display_name'),
+      supabase.from('teams').select('*').order('name'),
     ])
     setPeople(data ?? [])
     const map = {}
     ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
     setProfiles(map)
+    setTeams(teamsData ?? [])
     setLoading(false)
   }
-
-  const [saveError, setSaveError] = useState(null)
 
   async function handleSaveEdit(id, updates) {
     setSaveError(null)
@@ -132,8 +249,8 @@ export default function ParticipantsPage() {
 
   async function handleSaveNew(data) {
     setSaveError(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase.from('people').insert({ ...data, created_by: user.id })
+    const { data: { user: u } } = await supabase.auth.getUser()
+    const { error } = await supabase.from('people').insert({ ...data, created_by: u.id })
     if (error) { setSaveError(error.message); return }
     setAddingNew(false)
     load()
@@ -156,9 +273,9 @@ export default function ParticipantsPage() {
     if (parsed.length === 0) return
     setPasteSaving(true)
     setSaveError(null)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user: u } } = await supabase.auth.getUser()
     const { error } = await supabase.from('people').upsert(
-      parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
+      parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: u.id })),
       { onConflict: 'email,created_by' }
     )
     setPasteSaving(false)
@@ -169,22 +286,63 @@ export default function ParticipantsPage() {
     load()
   }
 
-  const filtered = people.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase()) ||
-    (p.top5 ?? []).some(s => s.toLowerCase().includes(search.toLowerCase()))
-  )
+  function openAddTeamModal(callback = null) {
+    setAddTeamCallback(() => callback)
+    setAddTeamModal(true)
+  }
+
+  async function handleTeamCreated(team) {
+    setAddTeamModal(false)
+    await load() // refresh teams list
+    if (addTeamCallback) {
+      addTeamCallback(team)
+      setAddTeamCallback(null)
+    }
+  }
+
+  const teamMap = {}
+  teams.forEach(t => { teamMap[t.id] = t })
+
+  const filtered = people.filter(p => {
+    const teamName = p.team_id ? (teamMap[p.team_id]?.name ?? '') : ''
+    const q = search.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q) ||
+      (p.top5 ?? []).some(s => s.toLowerCase().includes(q)) ||
+      teamName.toLowerCase().includes(q)
+    )
+  })
 
   return (
     <Layout>
+      {addTeamModal && (
+        <AddTeamModal
+          onSave={handleTeamCreated}
+          onClose={() => { setAddTeamModal(false); setAddTeamCallback(null) }}
+        />
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/teams')}
+            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Edit Teams
+          </button>
           <button
             onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
             className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
           >
             + Paste Multiple
+          </button>
+          <button
+            onClick={() => openAddTeamModal(null)}
+            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add Team
           </button>
           <button
             onClick={() => { setAddingNew(true); setAddMode('single'); setEditingId(null) }}
@@ -200,7 +358,7 @@ export default function ParticipantsPage() {
           type="search"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search by name, email, or strength…"
+          placeholder="Search by name, email, strength, or team…"
           className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
       </div>
@@ -267,6 +425,7 @@ export default function ParticipantsPage() {
                 <th className="px-4 py-3 text-left font-medium">Name</th>
                 <th className="px-4 py-3 text-left font-medium">Email</th>
                 <th className="px-4 py-3 text-left font-medium">Top 5 Strengths</th>
+                <th className="px-4 py-3 text-left font-medium">Team</th>
                 <th className="px-4 py-3 text-left font-medium"></th>
               </tr>
             </thead>
@@ -274,13 +433,15 @@ export default function ParticipantsPage() {
               {addingNew && addMode === 'single' && (
                 <EditRow
                   person={BLANK}
+                  teams={teams}
                   onSave={handleSaveNew}
                   onCancel={() => setAddingNew(false)}
+                  onOpenAddTeam={openAddTeamModal}
                 />
               )}
               {filtered.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">
                     {search ? 'No results.' : 'No participants yet. Add your first person above.'}
                   </td>
                 </tr>
@@ -290,12 +451,15 @@ export default function ParticipantsPage() {
                 const sharedByName = !isOwner
                   ? (profiles[p.created_by] ?? 'Another coach')
                   : null
+                const team = p.team_id ? teamMap[p.team_id] : null
                 return editingId === p.id ? (
                   <EditRow
                     key={p.id}
                     person={p}
+                    teams={teams}
                     onSave={data => handleSaveEdit(p.id, data)}
                     onCancel={() => setEditingId(null)}
+                    onOpenAddTeam={openAddTeamModal}
                   />
                 ) : (
                   <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
@@ -312,6 +476,15 @@ export default function ParticipantsPage() {
                       <div className="flex flex-wrap gap-1">
                         {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {team ? (
+                        <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
+                          {team.name}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {isOwner ? (

@@ -7,6 +7,7 @@ import NewSessionPage from './pages/NewSessionPage'
 import WorksheetPage from './pages/WorksheetPage'
 import ParticipantsPage from './pages/ParticipantsPage'
 import ThemesPage from './pages/ThemesPage'
+import TeamsPage from './pages/TeamsPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/sessions/:id" element={<PrivateRoute><SessionPage /></PrivateRoute>} />
       <Route path="/participants" element={<PrivateRoute><ParticipantsPage /></PrivateRoute>} />
       <Route path="/themes" element={<PrivateRoute><ThemesPage /></PrivateRoute>} />
+      <Route path="/teams" element={<PrivateRoute><TeamsPage /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
