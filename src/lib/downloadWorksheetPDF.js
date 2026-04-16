@@ -117,6 +117,12 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
+  // In blank mode column 0 uses ellipsize so a long prompt can't push that
+  // cell's height above rowHeight and make rows unequal.
+  const col0Style = blank
+    ? { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'ellipsize' }
+    : { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 }
+
   autoTable(doc, {
     head: [['', ...strengths]],
     body: prompts.map((prompt, pi) => [
@@ -127,19 +133,29 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     margin: { left: 20, right: 20 },
     styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
     headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
-    columnStyles: { 0: { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 } },
+    columnStyles: { 0: col0Style },
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
-    alternateRowStyles: { fillColor: [252, 252, 253] },
+    alternateRowStyles: { fillColor: blank ? [255, 255, 255] : [252, 252, 253] },
     didParseCell(data) {
       if (data.section === 'head') {
         data.cell.styles.fillColor = data.column.index === 0
           ? [255, 255, 255]
           : (headerColors[data.column.index - 1] ?? [59, 91, 219])
       }
+      // Lock every body cell to rowHeight in blank mode so all rows are equal
+      if (blank && data.section === 'body') {
+        data.cell.styles.minCellHeight = rowHeight
+      }
     },
     willDrawCell(data) {
-      if (data.section === 'body' && data.column.index > 0) {
-        data.cell.styles.minCellHeight = rowHeight
+      if (data.section === 'body') {
+        if (blank) {
+          // Force uniform height across every cell — column 0 won't overflow thanks
+          // to ellipsize, so minCellHeight is the only driver for all rows
+          data.cell.styles.minCellHeight = rowHeight
+        } else if (data.column.index > 0) {
+          data.cell.styles.minCellHeight = 50
+        }
       }
     },
   })

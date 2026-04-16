@@ -369,8 +369,30 @@ export default function SessionPage() {
       {!editing && (
         <div className="flex flex-wrap items-center justify-end gap-2 mb-6">
 
-          {/* Downloads group */}
+          {/* Shared group — visible to all (owner + shared viewers) */}
           <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
+            {/* Send Links */}
+            {linksSentCount != null ? (
+              <span className="px-3 py-1.5 text-green-600 font-medium whitespace-nowrap">✓ Sent to {linksSentCount}</span>
+            ) : confirmSendLinks ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50">
+                <span className="text-blue-700 font-medium whitespace-nowrap">Send to {participants.length}?</span>
+                <button
+                  onClick={handleSendLinks}
+                  disabled={sendingLinks}
+                  className="font-semibold text-white bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
+                >{sendingLinks ? '…' : 'Send'}</button>
+                <button onClick={() => setConfirmSendLinks(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmSendLinks(true)}
+                disabled={participants.length === 0}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Email each participant their unique worksheet link"
+              >✉ Send Links</button>
+            )}
+            {/* Filled PDFs */}
             {batchDownloading ? (
               <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
                 PDFs {batchProgress ? `${batchProgress.current}/${batchProgress.total}` : '…'}
@@ -383,12 +405,14 @@ export default function SessionPage() {
                 title="Download filled worksheets as a ZIP"
               >↓ Filled PDFs</button>
             )}
+            {/* CSV */}
             <button
               onClick={downloadParticipantCSV}
               disabled={participants.length === 0}
               className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               title="Download participant list with worksheet links"
             >↓ CSV</button>
+            {/* Blank PDFs */}
             {blankDownloading ? (
               <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
                 Blank {blankProgress ? `${blankProgress.current}/${blankProgress.total}` : '…'}
@@ -403,36 +427,13 @@ export default function SessionPage() {
             )}
           </div>
 
-          {/* Owner actions group */}
+          {/* Owner-only group — Edit + Delete */}
           {isOwner && (
             <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
-              {/* Send Links */}
-              {linksSentCount != null ? (
-                <span className="px-3 py-1.5 text-green-600 font-medium whitespace-nowrap">✓ Sent to {linksSentCount}</span>
-              ) : confirmSendLinks ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50">
-                  <span className="text-blue-700 font-medium whitespace-nowrap">Send to {participants.length}?</span>
-                  <button
-                    onClick={handleSendLinks}
-                    disabled={sendingLinks}
-                    className="font-semibold text-white bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
-                  >{sendingLinks ? '…' : 'Send'}</button>
-                  <button onClick={() => setConfirmSendLinks(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmSendLinks(true)}
-                  disabled={participants.length === 0}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  title="Email each participant their unique worksheet link"
-                >✉ Send Links</button>
-              )}
-              {/* Edit */}
               <button
                 onClick={startEditing}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
               >Edit</button>
-              {/* Delete */}
               {confirmDelete ? (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50">
                   <span className="text-red-700 font-medium whitespace-nowrap">Delete?</span>
