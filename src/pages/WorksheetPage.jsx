@@ -199,7 +199,7 @@ export default function WorksheetPage() {
                           value={cells[`${pi}_${si}`] ?? ''}
                           onChange={e => handleCellChange(pi, si, e.target.value)}
                           placeholder="Your thoughts…"
-                          style={{ display: 'block', width: '100%', minHeight: '120px', height: '100%', resize: 'none', border: 'none', outline: 'none', padding: '10px 12px', fontSize: '13px', color: '#374151', lineHeight: '1.5', backgroundColor: 'transparent', overflow: 'hidden' }}
+                          style={{ display: 'block', width: '100%', minHeight: '120px', height: '100%', resize: 'none', border: 'none', outline: 'none', padding: '10px 12px', fontSize: '13px', color: '#374151', lineHeight: '1.5', backgroundColor: 'transparent', overflow: 'auto' }}
                           onFocus={e => e.target.style.backgroundColor = '#eff6ff'}
                           onBlur={e => e.target.style.backgroundColor = 'transparent'}
                         />
