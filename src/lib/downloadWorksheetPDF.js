@@ -106,6 +106,12 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     }
   }
 
+  // ── Column widths (blank mode = equal; filled mode = wider prompt col) ────
+  const usableWidth = pageWidth - 40 // 20 pt margin each side
+  const equalColWidth = blank
+    ? Math.floor(usableWidth / (strengths.length + 1))
+    : null
+
   // ── Row height ────────────────────────────────────────────────────────────
   const startY = infoY + 28
 
@@ -118,8 +124,8 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     ))
 
     // Text-based: measure how tall the longest prompt needs to be when wrapped.
-    // col0 width = 140 pt; cellPadding = 6 pt on each side → 128 pt of usable text width.
-    const col0TextWidth = 140 - 12
+    // Use the equal col width minus padding (6 pt each side) for the text area.
+    const col0TextWidth = equalColWidth - 12
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
     const lineH = 8 * doc.getLineHeightFactor()   // ≈ 9.2 pt per line
@@ -136,11 +142,17 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
-  // In blank mode allow wrapping — row height is pre-calculated to be tall enough
-  // for the longest prompt, so all rows stay equal and no text is clipped.
+  // In blank mode all columns share the same width; allow wrapping on the prompt
+  // column — row height is pre-calculated to accommodate the longest prompt.
   const col0Style = blank
-    ? { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak' }
+    ? { cellWidth: equalColWidth, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak' }
     : { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 }
+
+  // Build columnStyles — blank mode pins every column to equalColWidth
+  const columnStyles = { 0: col0Style }
+  if (blank) {
+    strengths.forEach((_, si) => { columnStyles[si + 1] = { cellWidth: equalColWidth } })
+  }
 
   autoTable(doc, {
     head: [['', ...strengths]],
@@ -152,7 +164,7 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     margin: { left: 20, right: 20 },
     styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
     headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
-    columnStyles: { 0: col0Style },
+    columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: blank ? [255, 255, 255] : [252, 252, 253] },
     didParseCell(data) {
