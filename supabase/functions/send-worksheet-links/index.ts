@@ -12,7 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { session_id, app_origin, participant_ids } = await req.json()
+    const body = await req.json()
+    console.log('REQUEST BODY:', JSON.stringify(body))
+    const { session_id, app_origin, participant_ids } = body
     if (!session_id || !app_origin) throw new Error('session_id and app_origin are required')
 
     const supabase = createClient(
@@ -26,6 +28,7 @@ serve(async (req) => {
       .select('*')
       .eq('id', session_id)
       .single()
+    console.log('SESSION FETCH:', session ? `ok (${session.id})` : `error: ${sessErr?.message}`)
     if (sessErr || !session) throw new Error('Session not found')
 
     // Fetch coach display name
