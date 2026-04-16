@@ -309,15 +309,15 @@ export default function SessionPage() {
 
       {/* Shared-by banner for non-owners */}
       {!isOwner && (
-        <div className="mt-3 mb-4 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
+        <div className="mt-3 mb-3 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
           <span className="text-xs text-gray-500">
             Shared by <span className="font-medium text-gray-700">{sharedByName}</span> — view only
           </span>
         </div>
       )}
 
-      {/* Header */}
-      <div className={`flex items-start justify-between ${isOwner ? 'mt-3' : ''} mb-6`}>
+      {/* Row 1 — title + share toggle + counts */}
+      <div className="flex items-start justify-between mt-3 mb-3">
         <div>
           {editing ? (
             <div className="space-y-2">
@@ -344,153 +344,116 @@ export default function SessionPage() {
             </>
           )}
         </div>
-        <div className="flex items-start gap-4">
+        <div className="flex items-center gap-3">
+          {isOwner && !editing && (
+            <button
+              onClick={handleToggleShare}
+              className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                session.shared
+                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                  : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+              }`}
+              title={session.shared ? 'Click to make private' : 'Click to share with other coaches'}
+            >
+              {session.shared ? '🌐 Shared' : '🔒 Private'}
+            </button>
+          )}
           <div className="text-right text-sm text-gray-500">
             <p>{participants.length} participants</p>
             <p className="text-xs mt-0.5">{submittedCount}/{participants.length} submitted</p>
           </div>
-          {!editing && (
-            <>
-              {/* Share toggle — owner only */}
-              {isOwner && (
-                <button
-                  onClick={handleToggleShare}
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                    session.shared
-                      ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                      : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                  }`}
-                  title={session.shared ? 'Click to make private' : 'Click to share with other coaches'}
-                >
-                  {session.shared ? '🌐 Shared' : '🔒 Private'}
-                </button>
-              )}
-
-              {/* Download PDFs — visible to all */}
-              {batchDownloading ? (
-                <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[200px]">
-                  <p className="font-medium text-gray-700 mb-0.5">Generating PDFs…</p>
-                  {batchProgress && (
-                    <p className="text-gray-500">
-                      {batchProgress.current} of {batchProgress.total}: {batchProgress.name}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={handleDownloadAll}
-                  disabled={participants.filter(p => p.responses?.length > 0).length === 0}
-                  className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-                  title="Download all worksheets as a ZIP"
-                >
-                  ↓ Download all PDFs
-                </button>
-              )}
-
-              {/* CSV export — visible to all */}
-              <button
-                onClick={downloadParticipantCSV}
-                disabled={participants.length === 0}
-                className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-                title="Download participant list with worksheet links"
-              >
-                ↓ Download CSV
-              </button>
-
-              {/* Blank PDFs — visible to all */}
-              {blankDownloading ? (
-                <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[180px]">
-                  <p className="font-medium text-gray-700 mb-0.5">Building blank PDFs…</p>
-                  {blankProgress && (
-                    <p className="text-gray-500">{blankProgress.current} of {blankProgress.total}: {blankProgress.name}</p>
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={handleDownloadAllBlank}
-                  disabled={participants.length === 0}
-                  className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-                  title="Download blank print-ready worksheets for all participants"
-                >
-                  ↓ Blank PDFs
-                </button>
-              )}
-
-              {/* Send Links — owner only */}
-              {isOwner && (
-                linksSentCount != null ? (
-                  <span className="text-xs text-green-600 font-medium">✓ Sent to {linksSentCount}</span>
-                ) : confirmSendLinks ? (
-                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-                    <span className="text-xs text-blue-700 font-medium">
-                      Send links to {participants.length} participant{participants.length !== 1 ? 's' : ''}?
-                    </span>
-                    <button
-                      onClick={handleSendLinks}
-                      disabled={sendingLinks}
-                      className="text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded transition-colors disabled:opacity-60"
-                    >
-                      {sendingLinks ? 'Sending…' : 'Send'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmSendLinks(false)}
-                      className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmSendLinks(true)}
-                    disabled={participants.length === 0}
-                    className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-                    title="Email each participant their unique worksheet link"
-                  >
-                    ✉ Send Links
-                  </button>
-                )
-              )}
-
-              {/* Edit / Delete — owner only */}
-              {isOwner && (
-                <>
-                  <button
-                    onClick={startEditing}
-                    className="text-xs text-gray-400 hover:text-brand-500 transition-colors font-medium"
-                  >
-                    Edit session
-                  </button>
-                  {confirmDelete ? (
-                    <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                      <span className="text-xs text-red-700 font-medium">Delete this session?</span>
-                      <button
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-1 rounded transition-colors disabled:opacity-60"
-                      >
-                        {deleting ? 'Deleting…' : 'Yes, delete'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(false)}
-                        className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDelete(true)}
-                      className="text-xs text-gray-400 hover:text-red-500 transition-colors font-medium"
-                    >
-                      Delete session
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          )}
         </div>
       </div>
+
+      {/* Row 2 — action bar (hidden while editing) */}
+      {!editing && (
+        <div className="flex flex-wrap items-center justify-end gap-2 mb-6">
+
+          {/* Downloads group */}
+          <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
+            {batchDownloading ? (
+              <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
+                PDFs {batchProgress ? `${batchProgress.current}/${batchProgress.total}` : '…'}
+              </span>
+            ) : (
+              <button
+                onClick={handleDownloadAll}
+                disabled={participants.filter(p => p.responses?.length > 0).length === 0}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Download filled worksheets as a ZIP"
+              >↓ Filled PDFs</button>
+            )}
+            <button
+              onClick={downloadParticipantCSV}
+              disabled={participants.length === 0}
+              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Download participant list with worksheet links"
+            >↓ CSV</button>
+            {blankDownloading ? (
+              <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
+                Blank {blankProgress ? `${blankProgress.current}/${blankProgress.total}` : '…'}
+              </span>
+            ) : (
+              <button
+                onClick={handleDownloadAllBlank}
+                disabled={participants.length === 0}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Download blank print-ready worksheets"
+              >↓ Blank PDFs</button>
+            )}
+          </div>
+
+          {/* Owner actions group */}
+          {isOwner && (
+            <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
+              {/* Send Links */}
+              {linksSentCount != null ? (
+                <span className="px-3 py-1.5 text-green-600 font-medium whitespace-nowrap">✓ Sent to {linksSentCount}</span>
+              ) : confirmSendLinks ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50">
+                  <span className="text-blue-700 font-medium whitespace-nowrap">Send to {participants.length}?</span>
+                  <button
+                    onClick={handleSendLinks}
+                    disabled={sendingLinks}
+                    className="font-semibold text-white bg-brand-500 hover:bg-brand-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
+                  >{sendingLinks ? '…' : 'Send'}</button>
+                  <button onClick={() => setConfirmSendLinks(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmSendLinks(true)}
+                  disabled={participants.length === 0}
+                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  title="Email each participant their unique worksheet link"
+                >✉ Send Links</button>
+              )}
+              {/* Edit */}
+              <button
+                onClick={startEditing}
+                className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
+              >Edit</button>
+              {/* Delete */}
+              {confirmDelete ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50">
+                  <span className="text-red-700 font-medium whitespace-nowrap">Delete?</span>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
+                  >{deleting ? '…' : 'Yes'}</button>
+                  <button onClick={() => setConfirmDelete(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="px-3 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors"
+                >Delete</button>
+              )}
+            </div>
+          )}
+
+        </div>
+      )}
 
       {/* Prompts */}
       <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
