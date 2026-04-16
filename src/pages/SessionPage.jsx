@@ -392,6 +392,13 @@ export default function SessionPage() {
                 title="Email each participant their unique worksheet link"
               >✉ Send Links</button>
             )}
+            {/* CSV */}
+            <button
+              onClick={downloadParticipantCSV}
+              disabled={participants.length === 0}
+              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title="Download participant list with worksheet links"
+            >↓ CSV</button>
             {/* Filled PDFs */}
             {batchDownloading ? (
               <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
@@ -405,13 +412,6 @@ export default function SessionPage() {
                 title="Download filled worksheets as a ZIP"
               >↓ Filled PDFs</button>
             )}
-            {/* CSV */}
-            <button
-              onClick={downloadParticipantCSV}
-              disabled={participants.length === 0}
-              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title="Download participant list with worksheet links"
-            >↓ CSV</button>
             {/* Blank PDFs */}
             {blankDownloading ? (
               <span className="px-3 py-1.5 text-gray-500 whitespace-nowrap">
