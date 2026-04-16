@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import StrengthBadge from '../components/StrengthBadge'
 import { getStrengthColors } from '../lib/strengthColors'
+import { getWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 
 export default function WorksheetPage() {
   const { slug } = useParams()
@@ -91,8 +92,23 @@ export default function WorksheetPage() {
 
     if (upsertErr) { setError(upsertErr.message); setSubmitting(false); return }
 
+    // Generate PDF and base64-encode it for the email attachment
+    let pdfBase64 = null
+    let pdfFilename = null
+    try {
+      const blob = await getWorksheetPDFBlob(participant, session, buildRows(new Date().toISOString()))
+      pdfFilename = `${participant.name} - ${session.title}.pdf`
+      pdfBase64 = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result.split(',')[1])
+        reader.readAsDataURL(blob)
+      })
+    } catch (_) {
+      // PDF generation failed — send email without attachment
+    }
+
     await supabase.functions.invoke('send-worksheet-email', {
-      body: { participant_id: participant.id },
+      body: { participant_id: participant.id, pdf_base64: pdfBase64, pdf_filename: pdfFilename },
     })
 
     setSubmitted(true)

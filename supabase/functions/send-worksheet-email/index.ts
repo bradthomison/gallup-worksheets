@@ -6,21 +6,42 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Strength domain colours (mirrors src/lib/strengthColors.js) ───────────────
+const STRENGTH_HEADER_BG: Record<string, string> = {
+  // Executing — purple
+  Achiever: '#7c3aed', Arranger: '#7c3aed', Belief: '#7c3aed',
+  Consistency: '#7c3aed', Deliberative: '#7c3aed', Discipline: '#7c3aed',
+  Focus: '#7c3aed', Responsibility: '#7c3aed', Restorative: '#7c3aed',
+  // Influencing — orange
+  Activator: '#ea580c', Command: '#ea580c', Communication: '#ea580c',
+  Competition: '#ea580c', Maximizer: '#ea580c', 'Self-Assurance': '#ea580c',
+  Significance: '#ea580c', Woo: '#ea580c',
+  // Relationship Building — blue
+  Adaptability: '#2563eb', Connectedness: '#2563eb', Developer: '#2563eb',
+  Empathy: '#2563eb', Harmony: '#2563eb', Includer: '#2563eb',
+  Individualization: '#2563eb', Positivity: '#2563eb', Relator: '#2563eb',
+  // Strategic Thinking — green
+  Analytical: '#16a34a', Context: '#16a34a', Futuristic: '#16a34a',
+  Ideation: '#16a34a', Input: '#16a34a', Intellection: '#16a34a',
+  Learner: '#16a34a', Strategic: '#16a34a',
+}
+const strengthBg = (name: string) => STRENGTH_HEADER_BG[name] ?? '#3b5bdb'
+
 // ── Shared HTML helpers ───────────────────────────────────────────────────────
 
 function buildResponseTable(prompts: string[], strengths: string[], cellMap: Record<string, string>) {
-  const strengthHeaders = strengths
-    .map(s => `<th style="padding:10px 14px;background:#eef2ff;color:#3451c7;font-size:12px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;min-width:140px;">${s}</th>`)
-    .join('')
+  const strengthHeaders = strengths.map(s =>
+    `<th style="padding:10px 14px;background:${strengthBg(s)};color:#ffffff;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;min-width:140px;">${s}</th>`
+  ).join('')
 
   const rows = prompts.map((prompt, pi) => {
     const cells = strengths.map((_, si) => {
       const text = cellMap[`${pi}_${si}`] ?? ''
-      return `<td style="padding:10px 14px;vertical-align:top;border:1px solid #e5e7eb;font-size:13px;color:#374151;line-height:1.5;">${text || '<span style="color:#d1d5db;">—</span>'}</td>`
+      return `<td style="padding:10px 14px;vertical-align:top;border:1px solid #e5e7eb;font-size:13px;color:#111827;line-height:1.5;">${text || '<span style="color:#d1d5db;">—</span>'}</td>`
     }).join('')
     return `
       <tr>
-        <td style="padding:10px 14px;vertical-align:top;background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#6b7280;min-width:160px;">${pi + 1}. ${prompt}</td>
+        <td style="padding:10px 14px;vertical-align:top;background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#111827;min-width:160px;">${pi + 1}. ${prompt}</td>
         ${cells}
       </tr>`
   }).join('')
@@ -29,7 +50,7 @@ function buildResponseTable(prompts: string[], strengths: string[], cellMap: Rec
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead>
         <tr>
-          <th style="padding:10px 14px;background:#f9fafb;color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;text-align:left;">Prompt</th>
+          <th style="padding:10px 14px;background:#f9fafb;color:#111827;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;text-align:left;">Prompt</th>
           ${strengthHeaders}
         </tr>
       </thead>
@@ -37,7 +58,7 @@ function buildResponseTable(prompts: string[], strengths: string[], cellMap: Rec
     </table>`
 }
 
-function buildEmail(headerHtml: string, bodyHtml: string, tableHtml: string, footerText: string) {
+function buildEmail(headerHtml: string, bodyHtml: string, tableHtml: string, footerHtml: string) {
   return `
 <!DOCTYPE html>
 <html>
@@ -54,7 +75,7 @@ function buildEmail(headerHtml: string, bodyHtml: string, tableHtml: string, foo
       ${tableHtml}
     </div>
     <div style="padding:20px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">${footerText}</p>
+      <p style="margin:0;font-size:12px;color:#111827;">${footerHtml}</p>
     </div>
   </div>
 </body>
@@ -69,7 +90,7 @@ serve(async (req) => {
   }
 
   try {
-    const { participant_id } = await req.json()
+    const { participant_id, pdf_base64, pdf_filename } = await req.json()
     if (!participant_id) throw new Error('participant_id is required')
 
     const supabase = createClient(
@@ -83,12 +104,22 @@ serve(async (req) => {
       .select('*, sessions(*)')
       .eq('id', participant_id)
       .single()
-
     if (partErr || !participant) throw new Error('Participant not found')
 
     const session = participant.sessions
     const prompts: string[] = session.prompts ?? []
     const strengths: string[] = participant.top5 ?? []
+
+    // Fetch coach display name
+    const { data: coachProfile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', session.created_by)
+      .single()
+    const coachName = coachProfile?.display_name ?? null
+    const coachFooter = coachName
+      ? `Sent by your Gallup Strengths coach <strong>${coachName}</strong>`
+      : `Sent by your Gallup Strengths coach`
 
     // Fetch responses
     const { data: responses } = await supabase
@@ -107,16 +138,21 @@ serve(async (req) => {
     const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     const table = buildResponseTable(prompts, strengths, cellMap)
 
+    // PDF attachment (optional — passed from frontend)
+    const attachments = pdf_base64 && pdf_filename
+      ? [{ filename: pdf_filename, content: pdf_base64 }]
+      : []
+
     // ── 1. Email participant their copy ───────────────────────────────────────
     const participantHtml = buildEmail(
       `<p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">Gallup Strengths</p>
        <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>`,
-      `<p style="margin:0;font-size:15px;color:#374151;">Hi ${participant.name.split(' ')[0]},</p>
-       <p style="margin:10px 0 0;font-size:14px;color:#6b7280;line-height:1.6;">
+      `<p style="margin:0;font-size:15px;color:#111827;">Hi ${participant.name.split(' ')[0]},</p>
+       <p style="margin:10px 0 0;font-size:14px;color:#111827;line-height:1.6;">
          Here's a copy of your completed Gallup Strengths worksheet. Great work reflecting on how your top strengths show up in your life and work.
        </p>`,
       table,
-      `Sent by your Gallup Strengths coach · ${dateStr}`
+      coachFooter,
     )
 
     const participantRes = await fetch('https://api.resend.com/emails', {
@@ -127,9 +163,9 @@ serve(async (req) => {
         to: participant.email,
         subject: `Your Strengths Worksheet — ${session.title}`,
         html: participantHtml,
+        ...(attachments.length > 0 ? { attachments } : {}),
       }),
     })
-
     if (!participantRes.ok) {
       const body = await participantRes.text()
       throw new Error(`Resend error (participant): ${body}`)
@@ -143,12 +179,12 @@ serve(async (req) => {
         `<p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">New Submission</p>
          <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>`,
         `<p style="margin:0;font-size:16px;font-weight:600;color:#111827;">${participant.name}</p>
-         <p style="margin:2px 0 14px;font-size:13px;color:#9ca3af;">${participant.email}</p>
-         <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+         <p style="margin:2px 0 14px;font-size:13px;color:#111827;">${participant.email}</p>
+         <p style="margin:0;font-size:14px;color:#111827;line-height:1.6;">
            A participant has just submitted their Gallup Strengths worksheet. Their responses are below.
          </p>`,
         table,
-        `Gallup Strengths · ${dateStr}`
+        `Gallup Strengths · ${dateStr}`,
       )
 
       await fetch('https://api.resend.com/emails', {
@@ -159,6 +195,7 @@ serve(async (req) => {
           to: coachUser.email,
           subject: `New submission: ${participant.name} — ${session.title}`,
           html: coachHtml,
+          ...(attachments.length > 0 ? { attachments } : {}),
         }),
       })
       // We don't throw on coach email failure — participant email is the critical one

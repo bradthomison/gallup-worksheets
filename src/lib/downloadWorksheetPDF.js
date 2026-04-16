@@ -228,6 +228,12 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
   return doc.output('blob')
 }
 
+// ── Blob export (for attaching to emails, etc.) ───────────────────────────────
+
+export async function getWorksheetPDFBlob(participant, session, responses) {
+  return buildWorksheetPDF(participant, session, responses, false)
+}
+
 // ── Single downloads ──────────────────────────────────────────────────────────
 
 export async function downloadWorksheetPDF(participant, session, responses) {
