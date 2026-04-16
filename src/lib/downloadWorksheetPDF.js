@@ -141,6 +141,23 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     rowHeight = Math.max(pageBasedHeight, wrapBasedHeight)
   }
 
+  // ── Optimal prompt font size (blank mode only) ────────────────────────────
+  // rowHeight is now fixed. Climb from 8 pt upward: the largest size where every
+  // prompt still wraps within the cell's inner height is the one we use for all
+  // prompts — so the longest fills its box and all others match that size.
+  let promptFontSize = 8
+  if (blank) {
+    const innerH = rowHeight - 12   // subtract top + bottom cell padding
+    const innerW = equalColWidth - 12
+    for (let fs = 9; fs <= 40; fs++) {
+      doc.setFontSize(fs)
+      doc.setFont('helvetica', 'bold')
+      const lh = fs * doc.getLineHeightFactor()
+      const fits = prompts.every(p => doc.splitTextToSize(p, innerW).length * lh <= innerH)
+      if (fits) { promptFontSize = fs } else { break }
+    }
+  }
+
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
@@ -153,10 +170,10 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     for (let i = 0; i < totalCols; i++) {
       columnStyles[i] = { cellWidth: equalColWidth }
     }
-    // Apply prompt-column styling on top of the shared cellWidth
+    // Apply prompt-column styling — use the computed optimal font size
     Object.assign(columnStyles[0], {
       fontStyle: 'bold', fillColor: [248, 249, 250],
-      textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak',
+      textColor: [50, 50, 50], fontSize: promptFontSize, overflow: 'linebreak',
     })
   } else {
     columnStyles[0] = {
