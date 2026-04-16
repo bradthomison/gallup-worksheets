@@ -37,15 +37,16 @@ serve(async (req) => {
     const coachName = coachProfile?.display_name ?? null
 
     // Fetch participants — optionally filtered to a specific subset
-    let query = supabase
+    const baseQuery = supabase
       .from('participants')
       .select('id, name, email, worksheet_url_slug')
       .eq('session_id', session_id)
       .order('name')
-    if (Array.isArray(participant_ids) && participant_ids.length > 0) {
-      query = query.in('id', participant_ids)
-    }
-    const { data: participants } = await query
+    const { data: participants } = await (
+      Array.isArray(participant_ids) && participant_ids.length > 0
+        ? baseQuery.in('id', participant_ids)
+        : baseQuery
+    )
 
     const resendKey = Deno.env.get('RESEND_API_KEY')
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
