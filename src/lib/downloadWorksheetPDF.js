@@ -108,19 +108,38 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
 
   // ── Row height ────────────────────────────────────────────────────────────
   const startY = infoY + 28
-  // In blank mode: divide remaining page height evenly so everything fits on one page.
-  // 44 pt ≈ table header row height; 24 pt ≈ bottom margin + footer
-  const rowHeight = blank
-    ? Math.max(60, Math.floor((pageHeight - startY - 44 - 24) / Math.max(1, prompts.length)))
-    : 50
+
+  let rowHeight = 50
+  if (blank) {
+    // Page-based: divide remaining space so rows fill the page
+    // 44 pt ≈ table header row; 24 pt ≈ footer + bottom margin
+    const pageBasedHeight = Math.max(60, Math.floor(
+      (pageHeight - startY - 44 - 24) / Math.max(1, prompts.length)
+    ))
+
+    // Text-based: measure how tall the longest prompt needs to be when wrapped.
+    // col0 width = 140 pt; cellPadding = 6 pt on each side → 128 pt of usable text width.
+    const col0TextWidth = 140 - 12
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'bold')
+    const lineH = 8 * doc.getLineHeightFactor()   // ≈ 9.2 pt per line
+    const maxLines = prompts.reduce((max, prompt) => {
+      const lines = doc.splitTextToSize(prompt, col0TextWidth)
+      return Math.max(max, lines.length)
+    }, 1)
+    const wrapBasedHeight = Math.ceil(maxLines * lineH) + 12  // + top & bottom padding
+
+    // Use whichever is larger so prompts are always fully visible AND rows are equal
+    rowHeight = Math.max(pageBasedHeight, wrapBasedHeight)
+  }
 
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
-  // In blank mode column 0 uses ellipsize so a long prompt can't push that
-  // cell's height above rowHeight and make rows unequal.
+  // In blank mode allow wrapping — row height is pre-calculated to be tall enough
+  // for the longest prompt, so all rows stay equal and no text is clipped.
   const col0Style = blank
-    ? { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'ellipsize' }
+    ? { cellWidth: 140, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak' }
     : { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 }
 
   autoTable(doc, {
@@ -150,8 +169,8 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     willDrawCell(data) {
       if (data.section === 'body') {
         if (blank) {
-          // Force uniform height across every cell — column 0 won't overflow thanks
-          // to ellipsize, so minCellHeight is the only driver for all rows
+          // rowHeight is pre-calculated to fit the longest wrapped prompt,
+          // so minCellHeight makes every cell — including blank ones — equal height
           data.cell.styles.minCellHeight = rowHeight
         } else if (data.column.index > 0) {
           data.cell.styles.minCellHeight = 50
