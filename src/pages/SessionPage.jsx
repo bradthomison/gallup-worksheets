@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
-import { downloadSessionPDFs } from '../lib/downloadWorksheetPDF'
+import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
 import { useAuth } from '../hooks/useAuth'
 
 export default function SessionPage() {
@@ -22,6 +22,11 @@ export default function SessionPage() {
   const [deleting, setDeleting] = useState(false)
   const [batchDownloading, setBatchDownloading] = useState(false)
   const [batchProgress, setBatchProgress] = useState(null)
+  const [blankDownloading, setBlankDownloading] = useState(false)
+  const [blankProgress, setBlankProgress] = useState(null)
+  const [confirmSendLinks, setConfirmSendLinks] = useState(false)
+  const [sendingLinks, setSendingLinks] = useState(false)
+  const [linksSentCount, setLinksSentCount] = useState(null)
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -191,6 +196,31 @@ export default function SessionPage() {
     a.download = `${session.title} - Participants.csv`.replace(/[/\\?%*:|"<>]/g, '-')
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function handleSendLinks() {
+    setSendingLinks(true)
+    const { data, error } = await supabase.functions.invoke('send-worksheet-links', {
+      body: { session_id: id, app_origin: window.location.origin },
+    })
+    setSendingLinks(false)
+    setConfirmSendLinks(false)
+    if (!error && data?.sent != null) {
+      setLinksSentCount(data.sent)
+      setTimeout(() => setLinksSentCount(null), 4000)
+    }
+  }
+
+  async function handleDownloadAllBlank() {
+    setBlankDownloading(true)
+    setBlankProgress(null)
+    await downloadBlankSessionPDFs(
+      session,
+      participants,
+      (progress) => setBlankProgress(progress)
+    )
+    setBlankDownloading(false)
+    setBlankProgress(null)
   }
 
   async function handleToggleShare() {
@@ -367,6 +397,60 @@ export default function SessionPage() {
                 ↓ Download CSV
               </button>
 
+              {/* Blank PDFs — visible to all */}
+              {blankDownloading ? (
+                <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[180px]">
+                  <p className="font-medium text-gray-700 mb-0.5">Building blank PDFs…</p>
+                  {blankProgress && (
+                    <p className="text-gray-500">{blankProgress.current} of {blankProgress.total}: {blankProgress.name}</p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={handleDownloadAllBlank}
+                  disabled={participants.length === 0}
+                  className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                  title="Download blank print-ready worksheets for all participants"
+                >
+                  ↓ Blank PDFs
+                </button>
+              )}
+
+              {/* Send Links — owner only */}
+              {isOwner && (
+                linksSentCount != null ? (
+                  <span className="text-xs text-green-600 font-medium">✓ Sent to {linksSentCount}</span>
+                ) : confirmSendLinks ? (
+                  <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                    <span className="text-xs text-blue-700 font-medium">
+                      Send links to {participants.length} participant{participants.length !== 1 ? 's' : ''}?
+                    </span>
+                    <button
+                      onClick={handleSendLinks}
+                      disabled={sendingLinks}
+                      className="text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 px-2 py-1 rounded transition-colors disabled:opacity-60"
+                    >
+                      {sendingLinks ? 'Sending…' : 'Send'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmSendLinks(false)}
+                      className="text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmSendLinks(true)}
+                    disabled={participants.length === 0}
+                    className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                    title="Email each participant their unique worksheet link"
+                  >
+                    ✉ Send Links
+                  </button>
+                )
+              )}
+
               {/* Edit / Delete — owner only */}
               {isOwner && (
                 <>
@@ -498,12 +582,12 @@ export default function SessionPage() {
                           {removed ? 'Undo' : 'Remove'}
                         </button>
                       ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <a
                             href={worksheetUrl(p.worksheet_url_slug)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-xs text-brand-500 hover:underline truncate max-w-[180px]"
+                            className="text-xs text-brand-500 hover:underline truncate max-w-[160px]"
                           >
                             /worksheet/{p.worksheet_url_slug.slice(0, 8)}…
                           </a>
@@ -512,6 +596,13 @@ export default function SessionPage() {
                             className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
                           >
                             {copied === p.id ? '✓ Copied' : 'Copy'}
+                          </button>
+                          <button
+                            onClick={() => downloadBlankWorksheetPDF(p, session)}
+                            className="shrink-0 text-xs text-gray-400 hover:text-brand-500 transition-colors"
+                            title="Download blank print-ready worksheet"
+                          >
+                            ↓ Blank
                           </button>
                         </div>
                       )}

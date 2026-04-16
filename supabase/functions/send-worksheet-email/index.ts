@@ -6,6 +6,63 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ── Shared HTML helpers ───────────────────────────────────────────────────────
+
+function buildResponseTable(prompts: string[], strengths: string[], cellMap: Record<string, string>) {
+  const strengthHeaders = strengths
+    .map(s => `<th style="padding:10px 14px;background:#eef2ff;color:#3451c7;font-size:12px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;min-width:140px;">${s}</th>`)
+    .join('')
+
+  const rows = prompts.map((prompt, pi) => {
+    const cells = strengths.map((_, si) => {
+      const text = cellMap[`${pi}_${si}`] ?? ''
+      return `<td style="padding:10px 14px;vertical-align:top;border:1px solid #e5e7eb;font-size:13px;color:#374151;line-height:1.5;">${text || '<span style="color:#d1d5db;">—</span>'}</td>`
+    }).join('')
+    return `
+      <tr>
+        <td style="padding:10px 14px;vertical-align:top;background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#6b7280;min-width:160px;">${pi + 1}. ${prompt}</td>
+        ${cells}
+      </tr>`
+  }).join('')
+
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead>
+        <tr>
+          <th style="padding:10px 14px;background:#f9fafb;color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;text-align:left;">Prompt</th>
+          ${strengthHeaders}
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`
+}
+
+function buildEmail(headerHtml: string, bodyHtml: string, tableHtml: string, footerText: string) {
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
+  <div style="max-width:700px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
+    <div style="background:#3b5bdb;padding:24px 32px;">
+      ${headerHtml}
+    </div>
+    <div style="padding:28px 32px 20px;">
+      ${bodyHtml}
+    </div>
+    <div style="padding:0 32px 32px;overflow-x:auto;">
+      ${tableHtml}
+    </div>
+    <div style="padding:20px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
+      <p style="margin:0;font-size:12px;color:#9ca3af;">${footerText}</p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+// ── Handler ───────────────────────────────────────────────────────────────────
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -15,7 +72,6 @@ serve(async (req) => {
     const { participant_id } = await req.json()
     if (!participant_id) throw new Error('participant_id is required')
 
-    // Use service role key so we can read everything regardless of RLS
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -40,88 +96,72 @@ serve(async (req) => {
       .select('*')
       .eq('participant_id', participant_id)
 
-    // Build cell lookup
     const cellMap: Record<string, string> = {}
     ;(responses ?? []).forEach((r: any) => {
       cellMap[`${r.prompt_index}_${r.strength_index}`] = r.response_text
     })
 
-    // ── Build HTML email ──────────────────────────────────────────────────────
-    const strengthHeaders = strengths
-      .map(s => `<th style="padding:10px 14px;background:#eef2ff;color:#3451c7;font-size:12px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;min-width:140px;">${s}</th>`)
-      .join('')
-
-    const rows = prompts.map((prompt, pi) => {
-      const cells = strengths.map((_, si) => {
-        const text = cellMap[`${pi}_${si}`] ?? ''
-        return `<td style="padding:10px 14px;vertical-align:top;border:1px solid #e5e7eb;font-size:13px;color:#374151;line-height:1.5;">${text || '<span style="color:#d1d5db;">—</span>'}</td>`
-      }).join('')
-      return `
-        <tr>
-          <td style="padding:10px 14px;vertical-align:top;background:#f9fafb;border:1px solid #e5e7eb;font-size:12px;font-weight:600;color:#6b7280;min-width:160px;">${pi + 1}. ${prompt}</td>
-          ${cells}
-        </tr>`
-    }).join('')
-
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
-  <div style="max-width:700px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-    <!-- Header -->
-    <div style="background:#3b5bdb;padding:24px 32px;">
-      <p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">Gallup Strengths</p>
-      <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>
-    </div>
-    <!-- Greeting -->
-    <div style="padding:28px 32px 20px;">
-      <p style="margin:0;font-size:15px;color:#374151;">Hi ${participant.name.split(' ')[0]},</p>
-      <p style="margin:10px 0 0;font-size:14px;color:#6b7280;line-height:1.6;">
-        Here's a copy of your completed Gallup Strengths worksheet. Great work reflecting on how your top strengths show up in your life and work.
-      </p>
-    </div>
-    <!-- Grid -->
-    <div style="padding:0 32px 32px;overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;">
-        <thead>
-          <tr>
-            <th style="padding:10px 14px;background:#f9fafb;color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border:1px solid #e5e7eb;text-align:left;">Prompt</th>
-            ${strengthHeaders}
-          </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>
-    <!-- Footer -->
-    <div style="padding:20px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
-      <p style="margin:0;font-size:12px;color:#9ca3af;">Sent by your Gallup Strengths coach · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-    </div>
-  </div>
-</body>
-</html>`
-
-    // ── Send via Resend ───────────────────────────────────────────────────────
     const resendKey = Deno.env.get('RESEND_API_KEY')
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
+    const fromAddress = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    const table = buildResponseTable(prompts, strengths, cellMap)
 
-    const emailRes = await fetch('https://api.resend.com/emails', {
+    // ── 1. Email participant their copy ───────────────────────────────────────
+    const participantHtml = buildEmail(
+      `<p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">Gallup Strengths</p>
+       <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>`,
+      `<p style="margin:0;font-size:15px;color:#374151;">Hi ${participant.name.split(' ')[0]},</p>
+       <p style="margin:10px 0 0;font-size:14px;color:#6b7280;line-height:1.6;">
+         Here's a copy of your completed Gallup Strengths worksheet. Great work reflecting on how your top strengths show up in your life and work.
+       </p>`,
+      table,
+      `Sent by your Gallup Strengths coach · ${dateStr}`
+    )
+
+    const participantRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev',
+        from: fromAddress,
         to: participant.email,
         subject: `Your Strengths Worksheet — ${session.title}`,
-        html,
+        html: participantHtml,
       }),
     })
 
-    if (!emailRes.ok) {
-      const body = await emailRes.text()
-      throw new Error(`Resend error: ${body}`)
+    if (!participantRes.ok) {
+      const body = await participantRes.text()
+      throw new Error(`Resend error (participant): ${body}`)
+    }
+
+    // ── 2. Email coach the submission ─────────────────────────────────────────
+    const { data: { user: coachUser } } = await supabase.auth.admin.getUserById(session.created_by)
+
+    if (coachUser?.email) {
+      const coachHtml = buildEmail(
+        `<p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">New Submission</p>
+         <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>`,
+        `<p style="margin:0;font-size:16px;font-weight:600;color:#111827;">${participant.name}</p>
+         <p style="margin:2px 0 14px;font-size:13px;color:#9ca3af;">${participant.email}</p>
+         <p style="margin:0;font-size:14px;color:#6b7280;line-height:1.6;">
+           A participant has just submitted their Gallup Strengths worksheet. Their responses are below.
+         </p>`,
+        table,
+        `Gallup Strengths · ${dateStr}`
+      )
+
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: coachUser.email,
+          subject: `New submission: ${participant.name} — ${session.title}`,
+          html: coachHtml,
+        }),
+      })
+      // We don't throw on coach email failure — participant email is the critical one
     }
 
     return new Response(JSON.stringify({ ok: true }), {

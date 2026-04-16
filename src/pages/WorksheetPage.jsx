@@ -138,7 +138,9 @@ export default function WorksheetPage() {
       ) : (
         <form onSubmit={handleSubmit} className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
           <div className="mb-6">
-            <h1 className="text-xl font-bold text-gray-900">Your Strengths Worksheet</h1>
+            <h1 className="text-xl font-bold text-gray-900">
+              Your Strengths Worksheet{session.theme_name ? `: ${session.theme_name}` : ''}
+            </h1>
             <p className="text-sm text-gray-500 mt-1">
               Fill in each cell with your reflections. Take your time — your progress is not saved until you submit.
             </p>

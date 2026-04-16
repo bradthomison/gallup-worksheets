@@ -77,9 +77,14 @@ export default function NewSessionPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     // Insert session
+    // Capture theme name at save time (null if user manually edited prompts after selecting)
+    const themeName = selectedTheme
+      ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
+      : null
+
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
-      .insert({ title, date: date || null, prompts, created_by: user.id })
+      .insert({ title, date: date || null, prompts, created_by: user.id, theme_name: themeName })
       .select()
       .single()
 
