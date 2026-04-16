@@ -106,11 +106,13 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     }
   }
 
-  // ── Column widths (blank mode = equal; filled mode = wider prompt col) ────
-  const usableWidth = pageWidth - 40 // 20 pt margin each side
-  const equalColWidth = blank
-    ? Math.floor(usableWidth / (strengths.length + 1))
-    : null
+  // ── Column widths ─────────────────────────────────────────────────────────
+  // Blank: every column gets an identical share of the usable width.
+  // Exact division (no flooring) so the widths sum to exactly usableWidth
+  // and autoTable has nothing left to redistribute.
+  const usableWidth = pageWidth - 40  // 20 pt margin each side
+  const totalCols   = strengths.length + 1
+  const equalColWidth = blank ? usableWidth / totalCols : null
 
   // ── Row height ────────────────────────────────────────────────────────────
   const startY = infoY + 28
@@ -123,8 +125,8 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
       (pageHeight - startY - 44 - 24) / Math.max(1, prompts.length)
     ))
 
-    // Text-based: measure how tall the longest prompt needs to be when wrapped.
-    // Use the equal col width minus padding (6 pt each side) for the text area.
+    // Text-based: find how tall the longest prompt needs to be when wrapped.
+    // Inner text width = equalColWidth minus left+right cell padding (6 pt each).
     const col0TextWidth = equalColWidth - 12
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
@@ -135,23 +137,32 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     }, 1)
     const wrapBasedHeight = Math.ceil(maxLines * lineH) + 12  // + top & bottom padding
 
-    // Use whichever is larger so prompts are always fully visible AND rows are equal
+    // Use whichever is larger so prompts are fully visible AND all rows are equal
     rowHeight = Math.max(pageBasedHeight, wrapBasedHeight)
   }
 
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
-  // In blank mode all columns share the same width; allow wrapping on the prompt
-  // column — row height is pre-calculated to accommodate the longest prompt.
-  const col0Style = blank
-    ? { cellWidth: equalColWidth, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak' }
-    : { cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250], textColor: [50, 50, 50], fontSize: 9 }
-
-  // Build columnStyles — blank mode pins every column to equalColWidth
-  const columnStyles = { 0: col0Style }
+  // Build columnStyles.
+  // Blank: every column pinned to equalColWidth; tableWidth is also locked so
+  //        autoTable cannot stretch or shrink any column for any reason.
+  // Filled: only col 0 gets a fixed width; the rest size to content.
+  const columnStyles = {}
   if (blank) {
-    strengths.forEach((_, si) => { columnStyles[si + 1] = { cellWidth: equalColWidth } })
+    for (let i = 0; i < totalCols; i++) {
+      columnStyles[i] = { cellWidth: equalColWidth }
+    }
+    // Apply prompt-column styling on top of the shared cellWidth
+    Object.assign(columnStyles[0], {
+      fontStyle: 'bold', fillColor: [248, 249, 250],
+      textColor: [50, 50, 50], fontSize: 8, overflow: 'linebreak',
+    })
+  } else {
+    columnStyles[0] = {
+      cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250],
+      textColor: [50, 50, 50], fontSize: 9,
+    }
   }
 
   autoTable(doc, {
@@ -161,6 +172,7 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
       ...strengths.map((_, si) => cellMap[`${pi}_${si}`] ?? ''),
     ]),
     startY,
+    tableWidth: blank ? usableWidth : 'auto',  // lock table width in blank mode
     margin: { left: 20, right: 20 },
     styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
     headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
@@ -265,7 +277,7 @@ export async function downloadBlankSessionPDFs(session, participants, onProgress
     const participant = participants[i]
     onProgress?.({ current: i + 1, total: participants.length, name: participant.name })
     const blob = await buildWorksheetPDF(participant, session, [], true)
-    zip.file(safeName(`${participant.name} (Blank).pdf`), blob)
+    zip.file(safeName(`${participant.name} - ${session.title} (Blank).pdf`), blob)
   }
 
   const zipBlob = await zip.generateAsync({ type: 'blob' })
