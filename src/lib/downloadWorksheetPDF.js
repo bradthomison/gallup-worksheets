@@ -106,81 +106,71 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     }
   }
 
-  // ── Column widths ─────────────────────────────────────────────────────────
-  // Blank: every column gets an identical share of the usable width.
-  // Exact division (no flooring) so the widths sum to exactly usableWidth
-  // and autoTable has nothing left to redistribute.
+  // ── Column widths — equal for all columns in both modes ──────────────────
+  // Exact division so widths sum to exactly usableWidth with nothing left for
+  // autoTable to redistribute.
   const usableWidth = pageWidth - 40  // 20 pt margin each side
   const totalCols   = strengths.length + 1
-  const equalColWidth = blank ? usableWidth / totalCols : null
+  const equalColWidth = usableWidth / totalCols
 
   // ── Row height ────────────────────────────────────────────────────────────
   const startY = infoY + 28
 
+  // Blank: rows fill the page at a fixed uniform height.
+  // Filled: 50 pt minimum; response content can push rows taller naturally.
   let rowHeight = 50
   if (blank) {
-    // Page-based: divide remaining space so rows fill the page
+    // Page-based: divide remaining space so rows fill one page
     // 44 pt ≈ table header row; 24 pt ≈ footer + bottom margin
     const pageBasedHeight = Math.max(60, Math.floor(
       (pageHeight - startY - 44 - 24) / Math.max(1, prompts.length)
     ))
 
-    // Text-based: find how tall the longest prompt needs to be when wrapped.
+    // Text-based: ensure the longest prompt is fully visible when wrapped.
     // Inner text width = equalColWidth minus left+right cell padding (6 pt each).
     const col0TextWidth = equalColWidth - 12
     doc.setFontSize(8)
     doc.setFont('helvetica', 'bold')
-    const lineH = 8 * doc.getLineHeightFactor()   // ≈ 9.2 pt per line
+    const lineH = 8 * doc.getLineHeightFactor()
     const maxLines = prompts.reduce((max, prompt) => {
       const lines = doc.splitTextToSize(prompt, col0TextWidth)
       return Math.max(max, lines.length)
     }, 1)
     const wrapBasedHeight = Math.ceil(maxLines * lineH) + 12  // + top & bottom padding
 
-    // Use whichever is larger so prompts are fully visible AND all rows are equal
     rowHeight = Math.max(pageBasedHeight, wrapBasedHeight)
   }
 
-  // ── Optimal prompt font size (blank mode only) ────────────────────────────
-  // rowHeight is now fixed. Climb from 8 pt upward: the largest size where every
-  // prompt still wraps within the cell's inner height is the one we use for all
-  // prompts — so the longest fills its box and all others match that size.
+  // ── Optimal prompt font size ──────────────────────────────────────────────
+  // Climb from 8 pt upward — the largest size where every prompt still fits
+  // inside its cell's inner height (rowHeight − padding). Applied uniformly so
+  // the longest prompt fills its box and all shorter ones match that font size.
+  // Blank: constrained by the fixed rowHeight.
+  // Filled: constrained by the 50 pt minimum row height.
+  const innerH = rowHeight - 12   // rowHeight minus top + bottom cell padding
+  const innerW = equalColWidth - 12
   let promptFontSize = 8
-  if (blank) {
-    const innerH = rowHeight - 12   // subtract top + bottom cell padding
-    const innerW = equalColWidth - 12
-    for (let fs = 9; fs <= 40; fs++) {
-      doc.setFontSize(fs)
-      doc.setFont('helvetica', 'bold')
-      const lh = fs * doc.getLineHeightFactor()
-      const fits = prompts.every(p => doc.splitTextToSize(p, innerW).length * lh <= innerH)
-      if (fits) { promptFontSize = fs } else { break }
-    }
+  for (let fs = 9; fs <= 40; fs++) {
+    doc.setFontSize(fs)
+    doc.setFont('helvetica', 'bold')
+    const lh = fs * doc.getLineHeightFactor()
+    const fits = prompts.every(p => doc.splitTextToSize(p, innerW).length * lh <= innerH)
+    if (fits) { promptFontSize = fs } else { break }
   }
 
   // ── Table ──────────────────────────────────────────────────────────────────
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s).headerBg))
 
-  // Build columnStyles.
-  // Blank: every column pinned to equalColWidth; tableWidth is also locked so
-  //        autoTable cannot stretch or shrink any column for any reason.
-  // Filled: only col 0 gets a fixed width; the rest size to content.
+  // Equal column widths for every column; prompt column gets additional styling
+  // and the computed optimal font size.
   const columnStyles = {}
-  if (blank) {
-    for (let i = 0; i < totalCols; i++) {
-      columnStyles[i] = { cellWidth: equalColWidth }
-    }
-    // Apply prompt-column styling — use the computed optimal font size
-    Object.assign(columnStyles[0], {
-      fontStyle: 'bold', fillColor: [248, 249, 250],
-      textColor: [50, 50, 50], fontSize: promptFontSize, overflow: 'linebreak',
-    })
-  } else {
-    columnStyles[0] = {
-      cellWidth: 130, fontStyle: 'bold', fillColor: [248, 249, 250],
-      textColor: [50, 50, 50], fontSize: 9,
-    }
+  for (let i = 0; i < totalCols; i++) {
+    columnStyles[i] = { cellWidth: equalColWidth }
   }
+  Object.assign(columnStyles[0], {
+    fontStyle: 'bold', fillColor: [248, 249, 250],
+    textColor: [50, 50, 50], fontSize: promptFontSize, overflow: 'linebreak',
+  })
 
   autoTable(doc, {
     head: [['', ...strengths]],
@@ -189,7 +179,7 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
       ...strengths.map((_, si) => cellMap[`${pi}_${si}`] ?? ''),
     ]),
     startY,
-    tableWidth: blank ? usableWidth : 'auto',  // lock table width in blank mode
+    tableWidth: usableWidth,  // lock exact table width in both modes
     margin: { left: 20, right: 20 },
     styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
     headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
@@ -213,7 +203,7 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
           // rowHeight is pre-calculated to fit the longest wrapped prompt,
           // so minCellHeight makes every cell — including blank ones — equal height
           data.cell.styles.minCellHeight = rowHeight
-        } else if (data.column.index > 0) {
+        } else {
           data.cell.styles.minCellHeight = 50
         }
       }
