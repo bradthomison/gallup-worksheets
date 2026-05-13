@@ -12,40 +12,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install Supabase client
-        run: npm install @supabase/supabase-js
-
       - name: Ping Supabase database
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          node -e "
-          const { createClient } = require('@supabase/supabase-js');
+          echo "Pinging Supabase..."
 
-          const url = process.env.SUPABASE_URL;
-          const key = process.env.SUPABASE_KEY;
+          HTTP_STATUS=$(curl -o /tmp/ping_response.json -w "%{http_code}" -sf \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/sessions?select=id&limit=1")
 
-          if (!url || !key) {
-            console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY secret.');
-            process.exit(1);
-          }
-
-          const supabase = createClient(url, key);
-
-          supabase
-            .from('sessions')
-            .select('*', { count: 'exact', head: true })
-            .then(({ count, error }) => {
-              if (error) {
-                console.error('❌ Keep-alive ping failed:', error.message);
-                process.exit(1);
-              }
-              console.log('✅ Keep-alive ping succeeded — sessions table row count:', count);
-            });
-          "
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "✅ Keep-alive ping succeeded (HTTP $HTTP_STATUS)"
+            cat /tmp/ping_response.json
+          else
+            echo "❌ Keep-alive ping failed (HTTP $HTTP_STATUS)"
+            cat /tmp/ping_response.json
+            exit 1
+          fi
