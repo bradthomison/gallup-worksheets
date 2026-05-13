@@ -20,17 +20,21 @@ jobs:
           echo "Pinging Supabase..."
 
           CLEAN_URL="${SUPABASE_URL%/}"
+          echo "Resolved URL: $CLEAN_URL"
+          echo "Full request path: ${CLEAN_URL}/rest/v1/"
 
           HTTP_STATUS=$(curl -o /tmp/ping_response.json -w "%{http_code}" -s \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
-            "${CLEAN_URL}/rest/v1/sessions?select=id&limit=1")
+            "${CLEAN_URL}/rest/v1/")
+
+          echo "HTTP status: $HTTP_STATUS"
+          echo "Response body:"
+          cat /tmp/ping_response.json
 
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
-            echo "✅ Keep-alive ping succeeded (HTTP $HTTP_STATUS)"
-            cat /tmp/ping_response.json
+            echo "✅ Keep-alive ping succeeded"
           else
             echo "❌ Keep-alive ping failed (HTTP $HTTP_STATUS)"
-            cat /tmp/ping_response.json
             exit 1
           fi
