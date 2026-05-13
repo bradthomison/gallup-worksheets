@@ -1,0 +1,51 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # Mondays at 12:00 UTC
+    - cron: '0 12 * * 4'   # Thursdays at 12:00 UTC
+  workflow_dispatch:         # Allow manual trigger from Actions tab
+
+jobs:
+  ping:
+    name: Ping database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Supabase client
+        run: npm install @supabase/supabase-js
+
+      - name: Ping Supabase database
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          node -e "
+          const { createClient } = require('@supabase/supabase-js');
+
+          const url = process.env.SUPABASE_URL;
+          const key = process.env.SUPABASE_KEY;
+
+          if (!url || !key) {
+            console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY secret.');
+            process.exit(1);
+          }
+
+          const supabase = createClient(url, key);
+
+          supabase
+            .from('sessions')
+            .select('*', { count: 'exact', head: true })
+            .then(({ count, error }) => {
+              if (error) {
+                console.error('❌ Keep-alive ping failed:', error.message);
+                process.exit(1);
+              }
+              console.log('✅ Keep-alive ping succeeded — sessions table row count:', count);
+            });
+          "
