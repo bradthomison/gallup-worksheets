@@ -19,10 +19,12 @@ jobs:
         run: |
           echo "Pinging Supabase..."
 
+          CLEAN_URL="${SUPABASE_URL%/}"
+
           HTTP_STATUS=$(curl -o /tmp/ping_response.json -w "%{http_code}" -s \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
-            "$SUPABASE_URL/rest/v1/sessions?select=id&limit=1")
+            "${CLEAN_URL}/rest/v1/sessions?select=id&limit=1")
 
           if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
             echo "✅ Keep-alive ping succeeded (HTTP $HTTP_STATUS)"
