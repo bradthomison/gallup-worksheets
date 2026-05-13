@@ -26,7 +26,7 @@ jobs:
           HTTP_STATUS=$(curl -o /tmp/ping_response.json -w "%{http_code}" -s \
             -H "apikey: $SUPABASE_KEY" \
             -H "Authorization: Bearer $SUPABASE_KEY" \
-            "${CLEAN_URL}/rest/v1/")
+            "${CLEAN_URL}/rest/v1/sessions?select=id&limit=1")
 
           echo "HTTP status: $HTTP_STATUS"
           echo "Response body:"
