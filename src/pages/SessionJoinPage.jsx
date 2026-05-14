@@ -208,8 +208,8 @@ export default function SessionJoinPage() {
             </div>
           )}
 
-          {/* Manager bulk download — shown when manager is selected and worksheet is completed */}
-          {!checking && worksheetStatus === 'completed' && selectedParticipant?.is_manager && (
+          {/* Manager bulk download — shown whenever a manager is selected */}
+          {!checking && worksheetStatus !== null && selectedParticipant?.is_manager && (
             <div className="pt-4 border-t border-gray-100 space-y-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Manager</p>
               <p className="text-sm text-gray-600">
