@@ -18,6 +18,8 @@ export default function SessionJoinPage() {
   const [responses, setResponses] = useState([])
 
   const [downloading, setDownloading] = useState(false)
+  const [confirmReopen, setConfirmReopen] = useState(false)
+  const [reopening, setReopening] = useState(false)
   const [bulkDownloading, setBulkDownloading] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null)
 
@@ -81,6 +83,17 @@ export default function SessionJoinPage() {
     } finally {
       setDownloading(false)
     }
+  }
+
+  async function handleReopen() {
+    setReopening(true)
+    await supabase
+      .from('responses')
+      .update({ submitted_at: null })
+      .eq('participant_id', selectedParticipant.id)
+    setReopening(false)
+    setConfirmReopen(false)
+    setWorksheetStatus('in_progress')
   }
 
   async function downloadAllPDFs() {
@@ -205,6 +218,27 @@ export default function SessionJoinPage() {
               >
                 {downloading ? 'Generating PDF…' : '↓ Download Your Completed Worksheet'}
               </button>
+              {confirmReopen ? (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
+                  <span className="text-sm text-amber-800 font-medium">Reopen for editing?</span>
+                  <button
+                    onClick={handleReopen}
+                    disabled={reopening}
+                    className="text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 px-3 py-1 rounded-lg disabled:opacity-60 transition-colors"
+                  >{reopening ? '…' : 'Yes'}</button>
+                  <button
+                    onClick={() => setConfirmReopen(false)}
+                    className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                  >✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmReopen(true)}
+                  className="w-full text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 py-2.5 rounded-lg transition-colors"
+                >
+                  Reopen for Editing
+                </button>
+              )}
             </div>
           )}
 

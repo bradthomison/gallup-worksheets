@@ -12,6 +12,8 @@ export default function WorksheetPage() {
   const [cells, setCells] = useState({}) // { "promptIdx_strengthIdx": text }
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [confirmReopen, setConfirmReopen] = useState(false)
+  const [reopening, setReopening] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -115,6 +117,17 @@ export default function WorksheetPage() {
     setSubmitting(false)
   }
 
+  async function handleReopen() {
+    setReopening(true)
+    await supabase
+      .from('responses')
+      .update({ submitted_at: null })
+      .eq('participant_id', participant.id)
+    setConfirmReopen(false)
+    setReopening(false)
+    setSubmitted(false)
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center min-h-screen text-gray-500 text-sm">Loading worksheet…</div>
   )
@@ -150,6 +163,29 @@ export default function WorksheetPage() {
           <p className="text-gray-500 text-sm max-w-xs">
             Thank you, {participant.name.split(' ')[0]}. A copy of your responses has been sent to {participant.email}.
           </p>
+          <div className="mt-6">
+            {confirmReopen ? (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
+                <span className="text-sm text-amber-800 font-medium">Reopen for editing?</span>
+                <button
+                  onClick={handleReopen}
+                  disabled={reopening}
+                  className="text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 px-3 py-1 rounded-lg disabled:opacity-60 transition-colors"
+                >{reopening ? '…' : 'Yes'}</button>
+                <button
+                  onClick={() => setConfirmReopen(false)}
+                  className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                >✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmReopen(true)}
+                className="text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-4 py-2 rounded-lg transition-colors"
+              >
+                Reopen for Editing
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
