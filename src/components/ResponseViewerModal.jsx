@@ -1,8 +1,11 @@
-import StrengthBadge from './StrengthBadge'
+import { useState } from 'react'
 import { getStrengthColors } from '../lib/strengthColors'
 import { downloadWorksheetPDF } from '../lib/downloadWorksheetPDF'
 
-export default function ResponseViewerModal({ participant, session, responses, onClose }) {
+export default function ResponseViewerModal({ participant, session, responses, onClose, onUnsubmit }) {
+  const [confirmUnsubmit, setConfirmUnsubmit] = useState(false)
+  const [unsubmitting, setUnsubmitting] = useState(false)
+
   const prompts = session.prompts ?? []
   const strengths = participant.top5 ?? []
 
@@ -16,6 +19,13 @@ export default function ResponseViewerModal({ participant, session, responses, o
   const formattedDate = submittedAt
     ? new Date(submittedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null
+
+  async function handleUnsubmit() {
+    setUnsubmitting(true)
+    await onUnsubmit(participant.id)
+    setUnsubmitting(false)
+    onClose()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-y-auto">
@@ -39,6 +49,32 @@ export default function ResponseViewerModal({ participant, session, responses, o
               </svg>
               Download PDF
             </button>
+
+            {/* Unsubmit */}
+            {onUnsubmit && (
+              confirmUnsubmit ? (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs text-amber-800 font-medium whitespace-nowrap">Reopen for editing?</span>
+                  <button
+                    onClick={handleUnsubmit}
+                    disabled={unsubmitting}
+                    className="text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
+                  >{unsubmitting ? '…' : 'Yes'}</button>
+                  <button
+                    onClick={() => setConfirmUnsubmit(false)}
+                    className="text-gray-400 hover:text-gray-600 text-sm leading-none"
+                  >✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmUnsubmit(true)}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Reopen for Editing
+                </button>
+              )
+            )}
+
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors text-xl leading-none"

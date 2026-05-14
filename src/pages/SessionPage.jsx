@@ -319,6 +319,14 @@ export default function SessionPage() {
     setViewing({ participant, responses: responses ?? [] })
   }
 
+  async function handleUnsubmit(participantId) {
+    await supabase
+      .from('responses')
+      .update({ submitted_at: null })
+      .eq('participant_id', participantId)
+    load()
+  }
+
   async function handleDelete() {
     setDeleting(true)
     await supabase.from('sessions').delete().eq('id', id)
@@ -414,6 +422,7 @@ export default function SessionPage() {
           session={session}
           responses={viewing.responses}
           onClose={() => setViewing(null)}
+          onUnsubmit={handleUnsubmit}
         />
       )}
 
