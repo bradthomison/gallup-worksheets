@@ -258,18 +258,28 @@ export async function downloadBlankWorksheetPDF(participant, session) {
 
 // ── Batch downloads ───────────────────────────────────────────────────────────
 
-// Filled — participants who have any responses, bundled as ZIP
+// All participants — blank if not started, filled otherwise, bundled as ZIP
 export async function downloadSessionPDFs(session, participants, fetchResponses, onProgress) {
   logoCache = null
   const zip = new JSZip()
-  const eligible = participants.filter(p => p.responses?.length > 0)
 
-  for (let i = 0; i < eligible.length; i++) {
-    const participant = eligible[i]
-    onProgress?.({ current: i + 1, total: eligible.length, name: participant.name })
-    const responses = await fetchResponses(participant.id)
-    const blob = await buildWorksheetPDF(participant, session, responses, false)
-    zip.file(safeName(`${participant.name}.pdf`), blob)
+  for (let i = 0; i < participants.length; i++) {
+    const participant = participants[i]
+    onProgress?.({ current: i + 1, total: participants.length, name: participant.name })
+
+    const hasResponses = participant.responses?.length > 0
+    let responses = []
+    let blank = !hasResponses
+
+    if (hasResponses) {
+      responses = await fetchResponses(participant.id)
+    }
+
+    const blob = await buildWorksheetPDF(participant, session, responses, blank)
+    const label = blank
+      ? ' (Blank)'
+      : responses.some(r => r.submitted_at) ? '' : ' (In Progress)'
+    zip.file(safeName(`${participant.name} - ${session.title}${label}.pdf`), blob)
   }
 
   const zipBlob = await zip.generateAsync({ type: 'blob' })

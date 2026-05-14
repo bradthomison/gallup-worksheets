@@ -535,9 +535,9 @@ export default function SessionPage() {
             ) : (
               <button
                 onClick={handleDownloadAll}
-                disabled={participants.filter(p => p.responses?.length > 0).length === 0}
+                disabled={participants.length === 0}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Download filled worksheets as a ZIP"
+                title="Download all worksheets as a ZIP"
               >↓ Filled PDFs</button>
             )}
             {/* Blank PDFs */}
