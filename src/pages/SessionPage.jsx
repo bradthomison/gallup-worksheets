@@ -17,6 +17,7 @@ export default function SessionPage() {
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
+  const [copiedJoin, setCopiedJoin] = useState(false)
   const [viewing, setViewing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -56,7 +57,7 @@ export default function SessionPage() {
       supabase.from('sessions').select('*').eq('id', id).single(),
       supabase
         .from('participants')
-        .select('id, name, email, top5, worksheet_url_slug, responses(id, submitted_at)')
+        .select('id, name, email, top5, worksheet_url_slug, is_manager, responses(id, submitted_at)')
         .eq('session_id', id)
         .order('name'),
       supabase.from('profiles').select('id, display_name'),
@@ -147,6 +148,16 @@ export default function SessionPage() {
     // 3. Add selected existing people
     const fromPeople = people.filter(p => addSelected.has(p.id))
 
+    // Check which selected people are team managers (for auto is_manager flag)
+    let managerPeopleIds = new Set()
+    if (fromPeople.length > 0) {
+      const { data: managerTeams } = await supabase
+        .from('teams')
+        .select('manager_id')
+        .not('manager_id', 'is', null)
+      managerPeopleIds = new Set((managerTeams ?? []).map(t => t.manager_id).filter(Boolean))
+    }
+
     // 4. Add pasted new people
     const { parsed: fromPaste } = parseParticipants(pasteText)
     if (fromPaste.length > 0) {
@@ -157,7 +168,7 @@ export default function SessionPage() {
     }
 
     const newParticipants = [
-      ...fromPeople.map(p => ({ name: p.name, email: p.email, top5: p.top5 })),
+      ...fromPeople.map(p => ({ name: p.name, email: p.email, top5: p.top5, is_manager: managerPeopleIds.has(p.id) })),
       ...fromPaste,
     ]
     if (newParticipants.length > 0) {
@@ -167,6 +178,7 @@ export default function SessionPage() {
           name: p.name,
           email: p.email,
           top5: p.top5,
+          is_manager: p.is_manager ?? false,
           worksheet_url_slug: crypto.randomUUID(),
         }))
       )
@@ -268,6 +280,21 @@ export default function SessionPage() {
 
   function worksheetUrl(slug) {
     return `${window.location.origin}/worksheet/${slug}`
+  }
+
+  function joinUrl() {
+    return `${window.location.origin}/session/${id}/join`
+  }
+
+  async function copyJoinUrl() {
+    await navigator.clipboard.writeText(joinUrl())
+    setCopiedJoin(true)
+    setTimeout(() => setCopiedJoin(false), 2000)
+  }
+
+  async function handleToggleManager(participantId, current) {
+    await supabase.from('participants').update({ is_manager: !current }).eq('id', participantId)
+    setParticipants(prev => prev.map(p => p.id === participantId ? { ...p, is_manager: !current } : p))
   }
 
   async function copyUrl(slug, participantId) {
@@ -572,6 +599,34 @@ export default function SessionPage() {
         )}
       </div>
 
+      {/* Group Access Link */}
+      {!editing && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="font-semibold text-gray-900 mb-1">Group Access Link</h2>
+              <p className="text-xs text-gray-500 mb-2">
+                Share this link so participants can find their own worksheet from a dropdown list.
+              </p>
+              <a
+                href={joinUrl()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-brand-500 hover:underline break-all"
+              >
+                {joinUrl()}
+              </a>
+            </div>
+            <button
+              onClick={copyJoinUrl}
+              className="shrink-0 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            >
+              {copiedJoin ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Participants */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
         <div className="px-5 py-4 border-b border-gray-100">
@@ -598,7 +653,26 @@ export default function SessionPage() {
                 return (
                   <tr key={p.id} className={`transition-colors ${removed ? 'opacity-40 bg-red-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-5 py-3.5">
-                      <p className="font-medium text-gray-900">{p.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900">{p.name}</p>
+                        {p.is_manager && !editing && (
+                          <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                            Manager
+                          </span>
+                        )}
+                        {editing && isOwner && (
+                          <button
+                            onClick={() => handleToggleManager(p.id, p.is_manager)}
+                            className={`text-xs font-medium px-1.5 py-0.5 rounded-full border transition-colors ${
+                              p.is_manager
+                                ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                                : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                            }`}
+                          >
+                            {p.is_manager ? 'Manager ✓' : 'Manager'}
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-400">{p.email}</p>
                     </td>
                     <td className="px-5 py-3.5">

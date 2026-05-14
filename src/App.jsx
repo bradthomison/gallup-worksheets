@@ -8,6 +8,7 @@ import WorksheetPage from './pages/WorksheetPage'
 import ParticipantsPage from './pages/ParticipantsPage'
 import ThemesPage from './pages/ThemesPage'
 import TeamsPage from './pages/TeamsPage'
+import SessionJoinPage from './pages/SessionJoinPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -20,6 +21,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/worksheet/:slug" element={<WorksheetPage />} />
+      <Route path="/session/:sessionId/join" element={<SessionJoinPage />} />
       <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
       <Route path="/sessions/:id" element={<PrivateRoute><SessionPage /></PrivateRoute>} />

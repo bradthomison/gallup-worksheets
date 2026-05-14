@@ -10,6 +10,7 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
     name: team?.name ?? '',
     location: team?.location ?? '',
     primary_coach: team?.primary_coach ?? '',
+    manager_id: team?.manager_id ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -21,7 +22,7 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
   async function handleSave() {
     if (!form.name.trim()) { setError('Team name is required'); return }
     setSaving(true)
-    await onSave(form, team?.id ?? null)
+    await onSave({ ...form, manager_id: form.manager_id || null }, team?.id ?? null)
     setSaving(false)
   }
 
@@ -34,7 +35,7 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-6 py-5 space-y-5">
       {/* Team fields */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-gray-700 mb-1">Team Name *</label>
           <input
@@ -62,6 +63,19 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
             className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             placeholder="Coach name"
           />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Manager</label>
+          <select
+            value={form.manager_id}
+            onChange={e => setForm(f => ({ ...f, manager_id: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+          >
+            <option value="">No manager designated</option>
+            {currentMembers.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -160,7 +174,7 @@ export default function TeamsPage() {
 
   async function load() {
     const [{ data: teamsData }, { data: peopleData }, { data: profData }] = await Promise.all([
-      supabase.from('teams').select('*').order('name'),
+      supabase.from('teams').select('*, manager:manager_id(id, name)').order('name'),
       supabase.from('people').select('id, name, email, top5, team_id').order('name'),
       supabase.from('profiles').select('id, display_name'),
     ])
@@ -250,6 +264,7 @@ export default function TeamsPage() {
                 <th className="px-4 py-3 text-left font-medium">Team Name</th>
                 <th className="px-4 py-3 text-left font-medium">Location</th>
                 <th className="px-4 py-3 text-left font-medium">Primary Coach</th>
+                <th className="px-4 py-3 text-left font-medium">Manager</th>
                 <th className="px-4 py-3 text-left font-medium">Members</th>
                 <th className="px-4 py-3 text-left font-medium"></th>
               </tr>
@@ -258,7 +273,7 @@ export default function TeamsPage() {
               {/* "Add Team" inline panel as first row */}
               {editingId === 'new' && (
                 <tr>
-                  <td colSpan={5} className="p-0">
+                  <td colSpan={6} className="p-0">
                     <EditTeamPanel
                       team={null}
                       people={people}
@@ -273,7 +288,7 @@ export default function TeamsPage() {
 
               {filtered.length === 0 && editingId !== 'new' && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">
                     {search ? 'No results.' : 'No teams yet. Click "+ Add Team" to create your first one.'}
                   </td>
                 </tr>
@@ -299,6 +314,11 @@ export default function TeamsPage() {
                       </td>
                       <td className="px-4 py-3 text-gray-500">{team.location || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-500">{team.primary_coach || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-4 py-3 text-gray-500">
+                        {team.manager?.name
+                          ? <span className="text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">{team.manager.name}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
                           {memberCount} {memberCount === 1 ? 'member' : 'members'}
@@ -351,7 +371,7 @@ export default function TeamsPage() {
                     {/* Inline edit panel */}
                     {editingId === team.id && (
                       <tr key={`${team.id}-edit`}>
-                        <td colSpan={5} className="p-0">
+                        <td colSpan={6} className="p-0">
                           <EditTeamPanel
                             team={team}
                             people={people}
