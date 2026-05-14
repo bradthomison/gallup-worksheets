@@ -213,7 +213,7 @@ export default function SessionJoinPage() {
             <div className="pt-4 border-t border-gray-100 space-y-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Manager</p>
               <p className="text-sm text-gray-600">
-                Download completed worksheets for all team members in this session.
+                Download worksheets for all team members in this session.
               </p>
               <button
                 onClick={downloadAllPDFs}
