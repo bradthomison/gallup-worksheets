@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getWorksheetPDFBlob, downloadSessionPDFs } from '../lib/downloadWorksheetPDF'
+import { getWorksheetPDFBlob, downloadAllSessionPDFs } from '../lib/downloadWorksheetPDF'
 
 export default function SessionJoinPage() {
   const { sessionId } = useParams()
@@ -86,7 +86,7 @@ export default function SessionJoinPage() {
   async function downloadAllPDFs() {
     setBulkDownloading(true)
     setBulkProgress(null)
-    await downloadSessionPDFs(
+    await downloadAllSessionPDFs(
       session,
       participants,
       async (participantId) => {

@@ -281,6 +281,32 @@ export async function downloadSessionPDFs(session, participants, fetchResponses,
   URL.revokeObjectURL(url)
 }
 
+// All participants — blank if not started, filled (in progress or completed) otherwise
+export async function downloadAllSessionPDFs(session, participants, fetchResponses, onProgress) {
+  logoCache = null
+  const zip = new JSZip()
+
+  for (let i = 0; i < participants.length; i++) {
+    const participant = participants[i]
+    onProgress?.({ current: i + 1, total: participants.length, name: participant.name })
+    const responses = await fetchResponses(participant.id)
+    const blank = !responses || responses.length === 0
+    const blob = await buildWorksheetPDF(participant, session, responses ?? [], blank)
+    const label = blank
+      ? ' (Blank)'
+      : responses.some(r => r.submitted_at) ? '' : ' (In Progress)'
+    zip.file(safeName(`${participant.name}${label}.pdf`), blob)
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' })
+  const url = URL.createObjectURL(zipBlob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = safeName(`${session.title} - All Worksheets.zip`)
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // Blank — all participants, formatted for printing, bundled as ZIP
 export async function downloadBlankSessionPDFs(session, participants, onProgress) {
   logoCache = null
