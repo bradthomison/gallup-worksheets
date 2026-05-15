@@ -1,13 +1,20 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
+import StrengthBadge from '../components/StrengthBadge'
 import ResponseViewerModal from '../components/ResponseViewerModal'
-import { getWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
+import { getWorksheetPDFBlob, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
 
 function statusInfo(lmsResponses) {
-  if (!lmsResponses || lmsResponses.length === 0) return { label: 'Pending', color: 'bg-gray-100 text-gray-600' }
-  if (lmsResponses.some(r => r.submitted_at)) return { label: 'Submitted', color: 'bg-green-100 text-green-700' }
-  return { label: 'In Progress', color: 'bg-amber-100 text-amber-700' }
+  if (!lmsResponses || lmsResponses.length === 0) return { label: 'Pending', color: 'text-gray-500 bg-gray-100' }
+  if (lmsResponses.some(r => r.submitted_at)) return { label: 'Submitted', color: 'text-green-700 bg-green-50' }
+  return { label: 'In Progress', color: 'text-amber-700 bg-amber-50' }
+}
+
+function dotColor(label) {
+  if (label === 'Submitted') return 'bg-green-500'
+  if (label === 'In Progress') return 'bg-amber-400'
+  return 'bg-gray-400'
 }
 
 function safeName(str) {
@@ -16,49 +23,40 @@ function safeName(str) {
 
 function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
   const [collapsed, setCollapsed] = useState(false)
-  const [viewModal, setViewModal] = useState(null) // { ws, responses }
+  const [viewModal, setViewModal] = useState(null) // { ws, responses, isSubmitted }
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [reopenConfirm, setReopenConfirm] = useState(null)
   const [actionLoading, setActionLoading] = useState(null) // ws.id
+  const [copied, setCopied] = useState(null) // ws.id
 
-  async function handleView(ws) {
-    const { data: responses } = await supabase
-      .from('lms_responses')
-      .select('*')
-      .eq('lms_worksheet_id', ws.id)
-    setViewModal({ ws, responses: responses ?? [] })
-  }
-
-  async function handleDownloadPDF(ws) {
+  async function handleOpenStatus(ws) {
+    const status = statusInfo(ws.lms_responses)
+    if (status.label === 'Pending') return // nothing to show
     setActionLoading(ws.id)
     const { data: responses } = await supabase
       .from('lms_responses')
       .select('*')
       .eq('lms_worksheet_id', ws.id)
-    const session = { title: ws.theme.name, prompts: ws.theme.prompts }
+    setActionLoading(null)
+    setViewModal({ ws, responses: responses ?? [], isSubmitted: status.label === 'Submitted' })
+  }
+
+  async function handleDownloadBlank(ws) {
+    setActionLoading(ws.id)
     try {
-      const blob = await getWorksheetPDFBlob(ws.people, session, responses ?? [])
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = safeName(`${ws.people.name} - ${ws.theme.name}.pdf`)
-      a.click()
-      URL.revokeObjectURL(url)
+      await downloadBlankWorksheetPDF(
+        ws.people,
+        { title: ws.theme.name, prompts: ws.theme.prompts }
+      )
     } catch (err) {
       console.error('PDF error:', err)
     }
     setActionLoading(null)
   }
 
-  async function handleReopen(ws) {
-    setActionLoading(ws.id)
-    await supabase
-      .from('lms_responses')
-      .update({ submitted_at: null })
-      .eq('lms_worksheet_id', ws.id)
-    setReopenConfirm(null)
-    setActionLoading(null)
-    onReload()
+  async function copyUrl(wsId, slug) {
+    await navigator.clipboard.writeText(`${window.location.origin}/lms-worksheet/${slug}`)
+    setCopied(wsId)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   async function handleDelete(ws) {
@@ -76,6 +74,27 @@ function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
       .eq('lms_worksheet_id', wsId)
     setViewModal(null)
     onReload()
+  }
+
+  function makeDownloadPDF(ws, isSubmitted) {
+    const label = isSubmitted ? '' : ' (In Progress)'
+    return async () => {
+      try {
+        const blob = await getWorksheetPDFBlob(
+          ws.people,
+          { title: ws.theme.name, prompts: ws.theme.prompts },
+          viewModal?.responses ?? []
+        )
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = safeName(`${ws.people.name} - ${ws.theme.name}${label}.pdf`)
+        a.click()
+        URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('PDF error:', err)
+      }
+    }
   }
 
   return (
@@ -104,84 +123,79 @@ function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left font-medium">Name</th>
-                <th className="px-4 py-3 text-left font-medium">Email</th>
-                <th className="px-4 py-3 text-left font-medium">Top 5 Strengths</th>
-                <th className="px-4 py-3 text-left font-medium">Status</th>
-                <th className="px-4 py-3 text-left font-medium">Actions</th>
+                <th className="px-5 py-3 text-left font-medium">Name</th>
+                <th className="px-5 py-3 text-left font-medium">Top 5</th>
+                <th className="px-5 py-3 text-left font-medium">Status</th>
+                <th className="px-5 py-3 text-left font-medium">Worksheet URL</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {worksheets.map(ws => {
                 const status = statusInfo(ws.lms_responses)
-                const isSubmitted = status.label === 'Submitted'
+                const isClickable = status.label !== 'Pending'
                 const loading = actionLoading === ws.id
 
                 return (
                   <tr key={ws.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-gray-900">{ws.people.name}</td>
-                    <td className="px-4 py-3 text-gray-500">{ws.people.email}</td>
-                    <td className="px-4 py-3">
+                    {/* Name + email */}
+                    <td className="px-5 py-3.5">
+                      <p className="font-medium text-gray-900">{ws.people.name}</p>
+                      <p className="text-xs text-gray-400">{ws.people.email}</p>
+                    </td>
+
+                    {/* Top 5 with colored badges */}
+                    <td className="px-5 py-3.5">
                       <div className="flex flex-wrap gap-1">
                         {(ws.people.top5 ?? []).map((s, i) => (
-                          <span key={i} className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded-full">{s}</span>
+                          <StrengthBadge key={i} name={s} />
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>
-                        {status.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* View */}
-                        {isSubmitted && (
-                          <button
-                            onClick={() => handleView(ws)}
-                            disabled={loading}
-                            className="text-xs font-medium text-brand-500 hover:text-brand-700 disabled:opacity-60"
-                          >
-                            View
-                          </button>
-                        )}
 
-                        {/* PDF */}
+                    {/* Status — clickable for in_progress and submitted */}
+                    <td className="px-5 py-3.5">
+                      {isClickable ? (
                         <button
-                          onClick={() => handleDownloadPDF(ws)}
+                          onClick={() => handleOpenStatus(ws)}
                           disabled={loading}
-                          className="text-xs font-medium text-gray-600 hover:text-gray-900 disabled:opacity-60"
+                          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors hover:opacity-80 disabled:opacity-60 ${status.color}`}
                         >
-                          {loading ? '…' : '↓ PDF'}
+                          <span className={`w-1.5 h-1.5 rounded-full ${dotColor(status.label)}`}></span>
+                          {loading ? '…' : `${status.label} — View`}
                         </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          <span className="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                          Pending
+                        </span>
+                      )}
+                    </td>
 
-                        {/* Reopen */}
-                        {isSubmitted && (
-                          reopenConfirm === ws.id ? (
-                            <span className="flex items-center gap-1">
-                              <span className="text-xs text-gray-500">Reopen?</span>
-                              <button
-                                onClick={() => handleReopen(ws)}
-                                disabled={loading}
-                                className="text-xs font-medium text-amber-600 hover:underline disabled:opacity-60"
-                              >Yes</button>
-                              <button
-                                onClick={() => setReopenConfirm(null)}
-                                className="text-xs text-gray-400 hover:underline"
-                              >No</button>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => setReopenConfirm(ws.id)}
-                              disabled={loading}
-                              className="text-xs font-medium text-amber-600 hover:text-amber-800 disabled:opacity-60"
-                            >
-                              Reopen
-                            </button>
-                          )
-                        )}
-
-                        {/* Delete */}
+                    {/* Worksheet URL */}
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a
+                          href={`/lms-worksheet/${ws.worksheet_url_slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-brand-500 hover:underline truncate max-w-[140px]"
+                        >
+                          /lms-worksheet/{ws.worksheet_url_slug.slice(0, 8)}…
+                        </a>
+                        <button
+                          onClick={() => copyUrl(ws.id, ws.worksheet_url_slug)}
+                          className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                        >
+                          {copied === ws.id ? '✓ Copied' : 'Copy'}
+                        </button>
+                        <button
+                          onClick={() => handleDownloadBlank(ws)}
+                          disabled={loading}
+                          className="shrink-0 text-xs text-gray-400 hover:text-brand-500 transition-colors disabled:opacity-60"
+                          title="Download blank print-ready worksheet"
+                        >
+                          {loading ? '…' : '↓ Blank'}
+                        </button>
                         {deleteConfirm === ws.id ? (
                           <span className="flex items-center gap-1">
                             <span className="text-xs text-gray-500">Delete?</span>
@@ -199,7 +213,7 @@ function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
                           <button
                             onClick={() => setDeleteConfirm(ws.id)}
                             disabled={loading}
-                            className="text-xs font-medium text-red-400 hover:text-red-600 disabled:opacity-60"
+                            className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-60"
                           >
                             Delete
                           </button>
@@ -221,7 +235,8 @@ function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
           session={{ title: viewModal.ws.theme.name, prompts: viewModal.ws.theme.prompts }}
           responses={viewModal.responses}
           onClose={() => setViewModal(null)}
-          onUnsubmit={() => handleUnsubmit(viewModal.ws.id)}
+          onUnsubmit={viewModal.isSubmitted ? () => handleUnsubmit(viewModal.ws.id) : undefined}
+          onDownloadPDF={makeDownloadPDF(viewModal.ws, viewModal.isSubmitted)}
         />
       )}
     </div>

@@ -6,10 +6,15 @@ import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { useAuth } from '../hooks/useAuth'
+import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
 const BLANK = { name: '', email: '', top5: ['', '', '', '', ''], team_id: '' }
+
+function safeName(str) {
+  return str.replace(/[/\\?%*:|"<>]/g, '-')
+}
 
 // ── Add-Team modal ────────────────────────────────────────────────────────────
 function AddTeamModal({ onSave, onClose }) {
@@ -88,7 +93,7 @@ function AddTeamModal({ onSave, onClose }) {
 }
 
 // ── Edit / Add row ────────────────────────────────────────────────────────────
-function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
+function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, isOwner, shared, onToggleShare, onDeletePerson }) {
   const [form, setForm] = useState({
     name: person.name,
     email: person.email,
@@ -98,7 +103,6 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  // When a new team is created externally, accept it
   function applyNewTeam(team) {
     setForm(f => ({ ...f, team_id: team.id }))
   }
@@ -181,7 +185,7 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
         </select>
       </td>
       <td className="px-4 py-2 whitespace-nowrap">
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 items-center">
           <button
             onClick={handleSave}
             disabled={saving}
@@ -195,6 +199,27 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
           >
             Cancel
           </button>
+          {isOwner && onToggleShare && (
+            <button
+              onClick={onToggleShare}
+              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                shared
+                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+              }`}
+              title={shared ? 'Click to make private' : 'Click to share with other coaches'}
+            >
+              {shared ? 'Shared' : 'Private'}
+            </button>
+          )}
+          {isOwner && onDeletePerson && (
+            <button
+              onClick={onDeletePerson}
+              className="text-xs font-medium text-red-400 hover:text-red-600 transition-colors"
+            >
+              Delete
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -208,24 +233,25 @@ function statusInfo(responses) {
   return { label: 'In Progress', color: 'bg-amber-100 text-amber-700' }
 }
 
-function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onClose }) {
+function PersonWorksheetPanel({ person, onClose }) {
   const [sessionWs, setSessionWs] = useState(null)
   const [lmsWs, setLmsWs] = useState(null)
   const [loading, setLoading] = useState(true)
   const [lmsDeleteConfirm, setLmsDeleteConfirm] = useState(null)
   const [lmsDeleting, setLmsDeleting] = useState(null)
+  const [actionState, setActionState] = useState({}) // { [wsId]: null | 'downloading' | 'copying' | 'sending' | 'sent' | 'copied' }
 
   useEffect(() => {
     async function load() {
       const [{ data: sWs }, { data: lWs }] = await Promise.all([
         supabase
           .from('participants')
-          .select('id, worksheet_url_slug, responses(submitted_at), sessions:session_id(title, date)')
+          .select('id, worksheet_url_slug, session_id, responses(submitted_at), sessions:session_id(title, date, prompts)')
           .eq('email', person.email)
           .order('created_at', { ascending: false }),
         supabase
           .from('lms_worksheets')
-          .select('id, worksheet_url_slug, lms_responses(submitted_at), theme:theme_id(name)')
+          .select('id, worksheet_url_slug, lms_responses(submitted_at), theme:theme_id(name, prompts)')
           .eq('people_id', person.id)
           .order('created_at', { ascending: false }),
       ])
@@ -236,6 +262,73 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
     load()
   }, [person.id, person.email])
 
+  function wsAction(wsId) { return actionState[wsId] ?? null }
+  function setWsAction(wsId, state) {
+    setActionState(prev => ({ ...prev, [wsId]: state }))
+  }
+
+  async function downloadPDF(ws, type) {
+    setWsAction(ws.id, 'downloading')
+    try {
+      const participantLike = { name: person.name, email: person.email, top5: person.top5 }
+      let blob, filename
+
+      if (type === 'session') {
+        const sessionLike = { title: ws.sessions?.title ?? 'Session', prompts: ws.sessions?.prompts ?? [] }
+        const status = statusInfo(ws.responses)
+        if (status.label === 'Pending') {
+          blob = await getBlankWorksheetPDFBlob(participantLike, sessionLike)
+          filename = safeName(`${person.name} - ${ws.sessions?.title ?? 'Session'} (Blank).pdf`)
+        } else {
+          const { data: fullResponses } = await supabase.from('responses').select('*').eq('participant_id', ws.id)
+          blob = await getWorksheetPDFBlob(participantLike, sessionLike, fullResponses ?? [])
+          const label = status.label === 'In Progress' ? ' (In Progress)' : ''
+          filename = safeName(`${person.name} - ${ws.sessions?.title ?? 'Session'}${label}.pdf`)
+        }
+      } else {
+        const themeLike = { title: ws.theme?.name ?? 'LMS', prompts: ws.theme?.prompts ?? [] }
+        const status = statusInfo(ws.lms_responses)
+        if (status.label === 'Pending') {
+          blob = await getBlankWorksheetPDFBlob(participantLike, themeLike)
+          filename = safeName(`${person.name} - ${ws.theme?.name ?? 'LMS'} (Blank).pdf`)
+        } else {
+          const { data: fullResponses } = await supabase.from('lms_responses').select('*').eq('lms_worksheet_id', ws.id)
+          blob = await getWorksheetPDFBlob(participantLike, themeLike, fullResponses ?? [])
+          const label = status.label === 'In Progress' ? ' (In Progress)' : ''
+          filename = safeName(`${person.name} - ${ws.theme?.name ?? 'LMS'}${label}.pdf`)
+        }
+      }
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('PDF error:', err)
+    }
+    setWsAction(ws.id, null)
+  }
+
+  async function copyLink(wsId, slug, type) {
+    const url = type === 'session'
+      ? `${window.location.origin}/worksheet/${slug}`
+      : `${window.location.origin}/lms-worksheet/${slug}`
+    await navigator.clipboard.writeText(url)
+    setWsAction(wsId, 'copied')
+    setTimeout(() => setWsAction(wsId, null), 2000)
+  }
+
+  async function sendLink(ws) {
+    setWsAction(ws.id, 'sending')
+    await supabase.functions.invoke('send-worksheet-links', {
+      body: { session_id: ws.session_id, participant_ids: [ws.id], app_origin: window.location.origin },
+    })
+    setWsAction(ws.id, 'sent')
+    setTimeout(() => setWsAction(ws.id, null), 3000)
+  }
+
   async function handleDeleteLmsWs(ws) {
     setLmsDeleting(ws.id)
     await supabase.from('lms_worksheets').delete().eq('id', ws.id)
@@ -243,6 +336,10 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
     setLmsDeleteConfirm(null)
     setLmsDeleting(null)
   }
+
+  // Compact action button style
+  const actionBtn = 'text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors'
+  const actionBtnBrand = 'text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors'
 
   return (
     <div className="bg-blue-50 border-t border-blue-100 px-6 py-5">
@@ -270,20 +367,43 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
                     ? `${sess.title}${sess.date ? ` · ${new Date(sess.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
                     : 'Unknown session'
                   const status = statusInfo(ws.responses)
+                  const act = wsAction(ws.id)
                   return (
                     <div key={ws.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
+                        <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
                         <span className="text-sm text-gray-700 truncate">{label}</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
                       </div>
-                      <a
-                        href={`/worksheet/${ws.worksheet_url_slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-medium text-brand-500 hover:underline shrink-0 ml-2"
-                      >
-                        Open
-                      </a>
+                      <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+                        <a
+                          href={`/worksheet/${ws.worksheet_url_slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={actionBtnBrand}
+                        >
+                          Open
+                        </a>
+                        <button
+                          onClick={() => downloadPDF(ws, 'session')}
+                          disabled={act === 'downloading'}
+                          className={`pl-2.5 ${actionBtn} disabled:opacity-50`}
+                        >
+                          {act === 'downloading' ? '…' : '↓ PDF'}
+                        </button>
+                        <button
+                          onClick={() => copyLink(ws.id, ws.worksheet_url_slug, 'session')}
+                          className={`pl-2.5 ${actionBtn}`}
+                        >
+                          {act === 'copied' ? '✓ Copied' : 'Copy Link'}
+                        </button>
+                        <button
+                          onClick={() => sendLink(ws)}
+                          disabled={act === 'sending' || act === 'sent'}
+                          className={`pl-2.5 ${actionBtn} disabled:opacity-50`}
+                        >
+                          {act === 'sending' ? '…' : act === 'sent' ? '✓ Sent' : 'Send Link'}
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -302,23 +422,37 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
               <div className="space-y-1.5">
                 {lmsWs.map(ws => {
                   const status = statusInfo(ws.lms_responses)
+                  const act = wsAction(ws.id)
                   return (
                     <div key={ws.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
+                        <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
                         <span className="text-sm text-gray-700 truncate">{ws.theme?.name ?? 'Unknown theme'}</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                      <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
                         <a
                           href={`/lms-worksheet/${ws.worksheet_url_slug}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs font-medium text-brand-500 hover:underline"
+                          className={actionBtnBrand}
                         >
                           Open
                         </a>
+                        <button
+                          onClick={() => downloadPDF(ws, 'lms')}
+                          disabled={act === 'downloading'}
+                          className={`pl-2.5 ${actionBtn} disabled:opacity-50`}
+                        >
+                          {act === 'downloading' ? '…' : '↓ PDF'}
+                        </button>
+                        <button
+                          onClick={() => copyLink(ws.id, ws.worksheet_url_slug, 'lms')}
+                          className={`pl-2.5 ${actionBtn}`}
+                        >
+                          {act === 'copied' ? '✓ Copied' : 'Copy Link'}
+                        </button>
                         {lmsDeleteConfirm === ws.id ? (
-                          <span className="flex items-center gap-1">
+                          <span className="pl-2.5 flex items-center gap-1">
                             <span className="text-xs text-gray-500">Delete?</span>
                             <button
                               onClick={() => handleDeleteLmsWs(ws)}
@@ -333,7 +467,7 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
                         ) : (
                           <button
                             onClick={() => setLmsDeleteConfirm(ws.id)}
-                            className="text-xs font-medium text-red-400 hover:text-red-600"
+                            className="pl-2.5 text-xs font-medium text-red-400 hover:text-red-600 transition-colors"
                           >Delete</button>
                         )}
                       </div>
@@ -342,22 +476,6 @@ function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onC
                 })}
               </div>
             )}
-          </div>
-
-          {/* Person actions */}
-          <div className="flex items-center gap-2 pt-1 border-t border-blue-100">
-            <button
-              onClick={onEditPerson}
-              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Edit Person
-            </button>
-            <button
-              onClick={onDeletePerson}
-              className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Delete Person
-            </button>
           </div>
         </div>
       )}
@@ -386,7 +504,7 @@ export default function ParticipantsPage() {
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
-  const [addTeamCallback, setAddTeamCallback] = useState(null) // fn(team) to call after create
+  const [addTeamCallback, setAddTeamCallback] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -424,6 +542,8 @@ export default function ParticipantsPage() {
   async function handleDelete(id) {
     await supabase.from('people').delete().eq('id', id)
     setDeleteConfirm(null)
+    setEditingId(null)
+    setExpandedPersonId(null)
     load()
   }
 
@@ -458,7 +578,7 @@ export default function ParticipantsPage() {
 
   async function handleTeamCreated(team) {
     setAddTeamModal(false)
-    await load() // refresh teams list
+    await load()
     if (addTeamCallback) {
       addTeamCallback(team)
       setAddTeamCallback(null)
@@ -629,6 +749,10 @@ export default function ParticipantsPage() {
                     onSave={data => handleSaveEdit(p.id, data)}
                     onCancel={() => setEditingId(null)}
                     onOpenAddTeam={openAddTeamModal}
+                    isOwner={isOwner}
+                    shared={p.shared}
+                    onToggleShare={() => handleToggleShare(p)}
+                    onDeletePerson={() => { setDeleteConfirm(p.id); setEditingId(null) }}
                   />
                 ) : (
                   <>
@@ -657,18 +781,13 @@ export default function ParticipantsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {isOwner && (
                             <button
-                              onClick={() => handleToggleShare(p)}
-                              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
-                                p.shared
-                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
-                              }`}
-                              title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                              onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
+                              className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
                             >
-                              {p.shared ? 'Shared' : 'Private'}
+                              Edit Person
                             </button>
                           )}
                           {(isOwner || p.shared) && (
@@ -687,9 +806,6 @@ export default function ParticipantsPage() {
                         <td colSpan={5} className="p-0">
                           <PersonWorksheetPanel
                             person={p}
-                            teams={teams}
-                            onEditPerson={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
-                            onDeletePerson={() => setDeleteConfirm(p.id)}
                             onClose={() => setExpandedPersonId(null)}
                           />
                         </td>
@@ -699,7 +815,7 @@ export default function ParticipantsPage() {
                       <tr key={`${p.id}-del`}>
                         <td colSpan={5} className="px-4 py-2 bg-red-50 border-t border-red-100">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-600">Delete {p.name}?</span>
+                            <span className="text-xs text-gray-600">Delete {p.name}? This will also remove all their worksheets and responses.</span>
                             <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes, Delete</button>
                             <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
                           </div>

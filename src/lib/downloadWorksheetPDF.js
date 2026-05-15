@@ -234,6 +234,10 @@ export async function getWorksheetPDFBlob(participant, session, responses) {
   return buildWorksheetPDF(participant, session, responses, false)
 }
 
+export async function getBlankWorksheetPDFBlob(participant, session) {
+  return buildWorksheetPDF(participant, session, [], true)
+}
+
 // ── Single downloads ──────────────────────────────────────────────────────────
 
 export async function downloadWorksheetPDF(participant, session, responses) {

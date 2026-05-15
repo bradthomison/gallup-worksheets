@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { getStrengthColors } from '../lib/strengthColors'
 import { downloadWorksheetPDF } from '../lib/downloadWorksheetPDF'
 
-export default function ResponseViewerModal({ participant, session, responses, onClose, onUnsubmit }) {
+export default function ResponseViewerModal({ participant, session, responses, onClose, onUnsubmit, onDownloadPDF }) {
   const [confirmUnsubmit, setConfirmUnsubmit] = useState(false)
   const [unsubmitting, setUnsubmitting] = useState(false)
 
@@ -41,7 +41,7 @@ export default function ResponseViewerModal({ participant, session, responses, o
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => downloadWorksheetPDF(participant, session, responses).catch(console.error)}
+              onClick={() => onDownloadPDF ? onDownloadPDF() : downloadWorksheetPDF(participant, session, responses).catch(console.error)}
               className="inline-flex items-center gap-1.5 text-sm font-medium bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded-lg transition-colors"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
