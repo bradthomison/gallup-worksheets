@@ -173,51 +173,57 @@ function ThemeGroup({ themeName, themeId, worksheets, onReload }) {
 
                     {/* Worksheet URL */}
                     <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <a
-                          href={`/lms-worksheet/${ws.worksheet_url_slug}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-brand-500 hover:underline truncate max-w-[140px]"
-                        >
-                          /lms-worksheet/{ws.worksheet_url_slug.slice(0, 8)}…
-                        </a>
-                        <button
-                          onClick={() => copyUrl(ws.id, ws.worksheet_url_slug)}
-                          className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                        >
-                          {copied === ws.id ? '✓ Copied' : 'Copy'}
-                        </button>
-                        <button
-                          onClick={() => handleDownloadBlank(ws)}
-                          disabled={loading}
-                          className="shrink-0 text-xs text-gray-400 hover:text-brand-500 transition-colors disabled:opacity-60"
-                          title="Download blank print-ready worksheet"
-                        >
-                          {loading ? '…' : '↓ Blank'}
-                        </button>
-                        {deleteConfirm === ws.id ? (
-                          <span className="flex items-center gap-1">
-                            <span className="text-xs text-gray-500">Delete?</span>
-                            <button
-                              onClick={() => handleDelete(ws)}
-                              disabled={loading}
-                              className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
-                            >Yes</button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className="text-xs text-gray-400 hover:underline"
-                            >No</button>
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(ws.id)}
-                            disabled={loading}
-                            className="shrink-0 text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-60"
+                      <div className="flex flex-col gap-1">
+                        {/* Row 1: URL + Copy */}
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={`/lms-worksheet/${ws.worksheet_url_slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-brand-500 hover:underline truncate max-w-[140px]"
                           >
-                            Delete
+                            /lms-worksheet/{ws.worksheet_url_slug.slice(0, 8)}…
+                          </a>
+                          <button
+                            onClick={() => copyUrl(ws.id, ws.worksheet_url_slug)}
+                            className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                          >
+                            {copied === ws.id ? '✓ Copied' : 'Copy'}
                           </button>
-                        )}
+                        </div>
+                        {/* Row 2: Blank + Delete */}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDownloadBlank(ws)}
+                            disabled={loading}
+                            className="text-xs text-gray-400 hover:text-brand-500 transition-colors disabled:opacity-60"
+                            title="Download blank print-ready worksheet"
+                          >
+                            {loading ? '…' : '↓ Blank'}
+                          </button>
+                          {deleteConfirm === ws.id ? (
+                            <span className="flex items-center gap-1">
+                              <span className="text-xs text-gray-500">Delete?</span>
+                              <button
+                                onClick={() => handleDelete(ws)}
+                                disabled={loading}
+                                className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                              >Yes</button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className="text-xs text-gray-400 hover:underline"
+                              >No</button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(ws.id)}
+                              disabled={loading}
+                              className="text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-60"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

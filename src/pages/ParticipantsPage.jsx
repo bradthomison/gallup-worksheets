@@ -184,41 +184,49 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, isOwner, shar
           <option value="__new__">+ Create new team…</option>
         </select>
       </td>
-      <td className="px-4 py-2 whitespace-nowrap">
-        <div className="flex flex-wrap gap-2 items-center">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="text-xs font-medium bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60"
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-          <button
-            onClick={onCancel}
-            className="text-xs font-medium text-gray-500 hover:text-gray-800 px-2 py-1.5 transition-colors"
-          >
-            Cancel
-          </button>
-          {isOwner && onToggleShare && (
+      <td className="px-4 py-2">
+        <div className="flex flex-col gap-1.5">
+          {/* Row 1: Save + Cancel */}
+          <div className="flex gap-2">
             <button
-              onClick={onToggleShare}
-              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
-                shared
-                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
-              }`}
-              title={shared ? 'Click to make private' : 'Click to share with other coaches'}
+              onClick={handleSave}
+              disabled={saving}
+              className="text-xs font-semibold bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white px-3 py-1 rounded-full border border-brand-500 transition-colors whitespace-nowrap"
             >
-              {shared ? 'Shared' : 'Private'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
-          )}
-          {isOwner && onDeletePerson && (
             <button
-              onClick={onDeletePerson}
-              className="text-xs font-medium text-red-400 hover:text-red-600 transition-colors"
+              onClick={onCancel}
+              className="text-xs font-medium text-gray-500 hover:text-gray-800 bg-white hover:bg-gray-50 px-3 py-1 rounded-full border border-gray-300 transition-colors whitespace-nowrap"
             >
-              Delete
+              Cancel
             </button>
+          </div>
+          {/* Row 2: Shared toggle + Delete */}
+          {(isOwner && (onToggleShare || onDeletePerson)) && (
+            <div className="flex gap-2">
+              {isOwner && onToggleShare && (
+                <button
+                  onClick={onToggleShare}
+                  className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors whitespace-nowrap ${
+                    shared
+                      ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                      : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                  }`}
+                  title={shared ? 'Click to make private' : 'Click to share with other coaches'}
+                >
+                  {shared ? 'Shared' : 'Private'}
+                </button>
+              )}
+              {isOwner && onDeletePerson && (
+                <button
+                  onClick={onDeletePerson}
+                  className="text-xs font-medium px-3 py-1 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           )}
         </div>
       </td>
