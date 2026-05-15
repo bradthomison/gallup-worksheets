@@ -10,6 +10,15 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState(null)
+  const [lmsCopied, setLmsCopied] = useState(false)
+
+  function copyLmsLink() {
+    const url = `${window.location.origin}/lms/${theme.id}`
+    navigator.clipboard.writeText(url).then(() => {
+      setLmsCopied(true)
+      setTimeout(() => setLmsCopied(false), 2000)
+    })
+  }
 
   function startEdit() {
     setName(theme.name)
@@ -84,6 +93,20 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
       {/* Expanded content */}
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50">
+          {/* LMS Link */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 mb-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
+              <p className="text-xs text-brand-500 truncate">{`${window.location.origin}/lms/${theme.id}`}</p>
+            </div>
+            <button
+              onClick={copyLmsLink}
+              className="shrink-0 ml-4 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            >
+              {lmsCopied ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+
           {editing ? (
             <div className="space-y-3">
               <div>

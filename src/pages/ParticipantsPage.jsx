@@ -201,6 +201,170 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam }) {
   )
 }
 
+// ── PersonWorksheetPanel ──────────────────────────────────────────────────────
+function statusInfo(responses) {
+  if (!responses || responses.length === 0) return { label: 'Pending', color: 'bg-gray-100 text-gray-600' }
+  if (responses.some(r => r.submitted_at)) return { label: 'Submitted', color: 'bg-green-100 text-green-700' }
+  return { label: 'In Progress', color: 'bg-amber-100 text-amber-700' }
+}
+
+function PersonWorksheetPanel({ person, teams, onEditPerson, onDeletePerson, onClose }) {
+  const [sessionWs, setSessionWs] = useState(null)
+  const [lmsWs, setLmsWs] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [lmsDeleteConfirm, setLmsDeleteConfirm] = useState(null)
+  const [lmsDeleting, setLmsDeleting] = useState(null)
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: sWs }, { data: lWs }] = await Promise.all([
+        supabase
+          .from('participants')
+          .select('id, worksheet_url_slug, responses(submitted_at), sessions:session_id(title, date)')
+          .eq('email', person.email)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('lms_worksheets')
+          .select('id, worksheet_url_slug, lms_responses(submitted_at), theme:theme_id(name)')
+          .eq('people_id', person.id)
+          .order('created_at', { ascending: false }),
+      ])
+      setSessionWs(sWs ?? [])
+      setLmsWs(lWs ?? [])
+      setLoading(false)
+    }
+    load()
+  }, [person.id, person.email])
+
+  async function handleDeleteLmsWs(ws) {
+    setLmsDeleting(ws.id)
+    await supabase.from('lms_worksheets').delete().eq('id', ws.id)
+    setLmsWs(prev => prev.filter(w => w.id !== ws.id))
+    setLmsDeleteConfirm(null)
+    setLmsDeleting(null)
+  }
+
+  return (
+    <div className="bg-blue-50 border-t border-blue-100 px-6 py-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">{person.name}'s Worksheets</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-gray-400">Loading…</p>
+      ) : (
+        <div className="space-y-5">
+          {/* Session Worksheets */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Session Worksheets ({sessionWs.length})
+            </p>
+            {sessionWs.length === 0 ? (
+              <p className="text-xs text-gray-400">None yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {sessionWs.map(ws => {
+                  const sess = ws.sessions
+                  const label = sess
+                    ? `${sess.title}${sess.date ? ` · ${new Date(sess.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
+                    : 'Unknown session'
+                  const status = statusInfo(ws.responses)
+                  return (
+                    <div key={ws.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm text-gray-700 truncate">{label}</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
+                      </div>
+                      <a
+                        href={`/worksheet/${ws.worksheet_url_slug}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-brand-500 hover:underline shrink-0 ml-2"
+                      >
+                        Open
+                      </a>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* LMS Worksheets */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              LMS Worksheets ({lmsWs.length})
+            </p>
+            {lmsWs.length === 0 ? (
+              <p className="text-xs text-gray-400">None yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {lmsWs.map(ws => {
+                  const status = statusInfo(ws.lms_responses)
+                  return (
+                    <div key={ws.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-sm text-gray-700 truncate">{ws.theme?.name ?? 'Unknown theme'}</span>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <a
+                          href={`/lms-worksheet/${ws.worksheet_url_slug}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-medium text-brand-500 hover:underline"
+                        >
+                          Open
+                        </a>
+                        {lmsDeleteConfirm === ws.id ? (
+                          <span className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">Delete?</span>
+                            <button
+                              onClick={() => handleDeleteLmsWs(ws)}
+                              disabled={lmsDeleting === ws.id}
+                              className="text-xs font-medium text-red-600 hover:underline disabled:opacity-60"
+                            >Yes</button>
+                            <button
+                              onClick={() => setLmsDeleteConfirm(null)}
+                              className="text-xs text-gray-400 hover:underline"
+                            >No</button>
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setLmsDeleteConfirm(ws.id)}
+                            className="text-xs font-medium text-red-400 hover:text-red-600"
+                          >Delete</button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Person actions */}
+          <div className="flex items-center gap-2 pt-1 border-t border-blue-100">
+            <button
+              onClick={onEditPerson}
+              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-white hover:bg-brand-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Edit Person
+            </button>
+            <button
+              onClick={onDeletePerson}
+              className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Delete Person
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ParticipantsPage() {
   const { user } = useAuth()
@@ -218,6 +382,7 @@ export default function ParticipantsPage() {
   const [search, setSearch] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [saveError, setSaveError] = useState(null)
+  const [expandedPersonId, setExpandedPersonId] = useState(null)
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -466,74 +631,82 @@ export default function ParticipantsPage() {
                     onOpenAddTeam={openAddTeamModal}
                   />
                 ) : (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{p.name}</p>
-                      {!isOwner && (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                          Shared by {sharedByName}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{p.email}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
-                        {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {team ? (
-                        <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
-                          {team.name}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {(isOwner || p.shared) ? (
-                        deleteConfirm === p.id ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Delete?</span>
-                            <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes</button>
-                            <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">No</button>
-                          </div>
+                  <>
+                    <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{p.name}</p>
+                        {!isOwner && (
+                          <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
+                            Shared by {sharedByName}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500">{p.email}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {team ? (
+                          <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
+                            {team.name}
+                          </span>
                         ) : (
-                          <div className="flex items-center gap-3">
-                            {isOwner && (
-                              <button
-                                onClick={() => handleToggleShare(p)}
-                                className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
-                                  p.shared
-                                    ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                                    : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
-                                }`}
-                                title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
-                              >
-                                {p.shared ? 'Shared' : 'Private'}
-                              </button>
-                            )}
-                            <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button
-                                onClick={() => { setEditingId(p.id); setAddingNew(false) }}
-                                className="text-xs text-brand-500 font-medium hover:underline"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(p.id)}
-                                className="text-xs text-red-400 font-medium hover:underline"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          {isOwner && (
+                            <button
+                              onClick={() => handleToggleShare(p)}
+                              className={`text-xs font-medium px-2 py-0.5 rounded-full border transition-colors ${
+                                p.shared
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
+                                  : 'bg-gray-100 text-gray-400 border-gray-200 hover:bg-gray-200'
+                              }`}
+                              title={p.shared ? 'Click to make private' : 'Click to share with other coaches'}
+                            >
+                              {p.shared ? 'Shared' : 'Private'}
+                            </button>
+                          )}
+                          {(isOwner || p.shared) && (
+                            <button
+                              onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
+                              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Worksheets {expandedPersonId === p.id ? '↑' : '›'}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedPersonId === p.id && deleteConfirm !== p.id && (
+                      <tr key={`${p.id}-panel`}>
+                        <td colSpan={5} className="p-0">
+                          <PersonWorksheetPanel
+                            person={p}
+                            teams={teams}
+                            onEditPerson={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
+                            onDeletePerson={() => setDeleteConfirm(p.id)}
+                            onClose={() => setExpandedPersonId(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {deleteConfirm === p.id && (
+                      <tr key={`${p.id}-del`}>
+                        <td colSpan={5} className="px-4 py-2 bg-red-50 border-t border-red-100">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-600">Delete {p.name}?</span>
+                            <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes, Delete</button>
+                            <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">Cancel</button>
                           </div>
-                        )
-                      ) : (
-                        <span className="text-xs text-gray-300">—</span>
-                      )}
-                    </td>
-                  </tr>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
             </tbody>

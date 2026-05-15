@@ -52,6 +52,9 @@ export default function Layout({ children }) {
             <Link to="/themes" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Themes
             </Link>
+            <Link to="/lms-learners" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
+              LMS Learners
+            </Link>
 
             {/* User name + sign out */}
             <div className="flex items-center gap-3 border-l border-gray-200 pl-6">

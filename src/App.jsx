@@ -9,6 +9,9 @@ import ParticipantsPage from './pages/ParticipantsPage'
 import ThemesPage from './pages/ThemesPage'
 import TeamsPage from './pages/TeamsPage'
 import SessionJoinPage from './pages/SessionJoinPage'
+import LMSLandingPage from './pages/LMSLandingPage'
+import LMSWorksheetPage from './pages/LMSWorksheetPage'
+import LMSLearnersPage from './pages/LMSLearnersPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -22,12 +25,15 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/worksheet/:slug" element={<WorksheetPage />} />
       <Route path="/session/:sessionId/join" element={<SessionJoinPage />} />
+      <Route path="/lms/:themeId" element={<LMSLandingPage />} />
+      <Route path="/lms-worksheet/:slug" element={<LMSWorksheetPage />} />
       <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
       <Route path="/sessions/:id" element={<PrivateRoute><SessionPage /></PrivateRoute>} />
       <Route path="/participants" element={<PrivateRoute><ParticipantsPage /></PrivateRoute>} />
       <Route path="/themes" element={<PrivateRoute><ThemesPage /></PrivateRoute>} />
       <Route path="/teams" element={<PrivateRoute><TeamsPage /></PrivateRoute>} />
+      <Route path="/lms-learners" element={<PrivateRoute><LMSLearnersPage /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
