@@ -155,8 +155,7 @@ export default function DashboardPage() {
       const [{ data: sessData }, { data: profData }] = await Promise.all([
         supabase
           .from('sessions')
-          .select(`id, title, date, created_at, created_by, shared, archived,
-            participants ( id, responses ( submitted_at ) )`)
+          .select(`*, participants ( id, responses ( submitted_at ) )`)
           .order('date', { ascending: false }),
         supabase.from('profiles').select('id, display_name'),
       ])
