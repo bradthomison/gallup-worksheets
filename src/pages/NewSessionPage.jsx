@@ -16,8 +16,9 @@ export default function NewSessionPage() {
   const [selectedTheme, setSelectedTheme] = useState('')
 
   // Participant picker
-  const [tab, setTab] = useState('existing') // 'existing' | 'paste'
+  const [tab, setTab] = useState('existing') // 'existing' | 'team' | 'paste'
   const [people, setPeople] = useState([])
+  const [teams, setTeams] = useState([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(new Set()) // Set of person ids
 
@@ -31,7 +32,11 @@ export default function NewSessionPage() {
   useEffect(() => {
     supabase.from('people').select('*').order('name').then(({ data }) => setPeople(data ?? []))
     supabase.from('prompt_themes').select('*').order('name').then(({ data }) => setThemes(data ?? []))
+    supabase.from('teams').select('*').order('name').then(({ data }) => setTeams(data ?? []))
   }, [])
+
+  const teamMap = {}
+  teams.forEach(t => { teamMap[t.id] = t })
 
   function handleThemeChange(e) {
     const id = e.target.value
@@ -49,16 +54,36 @@ export default function NewSessionPage() {
     })
   }
 
+  function toggleTeam(teamId) {
+    const members = people.filter(p => p.team_id === teamId)
+    if (members.length === 0) return
+    const allSelected = members.every(p => selected.has(p.id))
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        members.forEach(p => next.delete(p.id))
+      } else {
+        members.forEach(p => next.add(p.id))
+      }
+      return next
+    })
+  }
+
   function handleParticipantChange(e) {
     setParticipantsText(e.target.value)
     setParseErrors(parseParticipants(e.target.value).errors)
   }
 
-  const filteredPeople = people.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase()) ||
-    (p.top5 ?? []).some(s => s.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filteredPeople = people.filter(p => {
+    const teamName = p.team_id ? (teamMap[p.team_id]?.name ?? '') : ''
+    const q = search.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q) ||
+      (p.top5 ?? []).some(s => s.toLowerCase().includes(q)) ||
+      teamName.toLowerCase().includes(q)
+    )
+  })
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -67,7 +92,6 @@ export default function NewSessionPage() {
     const prompts = promptsText.split('\n').map(s => s.trim()).filter(Boolean)
     if (prompts.length === 0) { setError('Add at least one prompt.'); return }
 
-    // Combine selected existing + pasted new
     const fromExisting = people.filter(p => selected.has(p.id))
     const { parsed: fromPaste, errors } = parseParticipants(participantsText)
     if (errors.length > 0) { setError('Fix participant format errors before saving.'); return }
@@ -76,8 +100,6 @@ export default function NewSessionPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Insert session
-    // Capture theme name at save time (null if user manually edited prompts after selecting)
     const themeName = selectedTheme
       ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
       : null
@@ -90,7 +112,6 @@ export default function NewSessionPage() {
 
     if (sessionErr) { setError(sessionErr.message); setSaving(false); return }
 
-    // Upsert any pasted people into the people table
     if (fromPaste.length > 0) {
       await supabase.from('people').upsert(
         fromPaste.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
@@ -98,7 +119,6 @@ export default function NewSessionPage() {
       )
     }
 
-    // Build participant rows
     const allParticipants = [
       ...fromExisting.map(p => ({ name: p.name, email: p.email, top5: p.top5 })),
       ...fromPaste,
@@ -210,6 +230,13 @@ export default function NewSessionPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setTab('team')}
+                  className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${tab === 'team' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                >
+                  Pick a team
+                </button>
+                <button
+                  type="button"
                   onClick={() => setTab('paste')}
                   className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${tab === 'paste' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
                 >
@@ -218,6 +245,7 @@ export default function NewSessionPage() {
               </div>
             </div>
 
+            {/* Pick existing */}
             {tab === 'existing' && (
               <>
                 {people.length === 0 ? (
@@ -231,7 +259,7 @@ export default function NewSessionPage() {
                       type="search"
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Search by name, email, or strength…"
+                      placeholder="Search by name, email, strength, or team…"
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                     <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
@@ -249,6 +277,9 @@ export default function NewSessionPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900">{p.name}</p>
                             <p className="text-xs text-gray-400">{p.email}</p>
+                            {p.team_id && teamMap[p.team_id] && (
+                              <p className="text-xs text-indigo-500 mt-0.5">{teamMap[p.team_id].name}</p>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-1 justify-end">
                             {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
@@ -264,6 +295,62 @@ export default function NewSessionPage() {
               </>
             )}
 
+            {/* Pick a team */}
+            {tab === 'team' && (
+              <>
+                {teams.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-4 text-center">
+                    No teams yet. Visit the{' '}
+                    <a href="/participants" className="text-brand-500 hover:underline">Participants page</a>{' '}
+                    to create teams.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {teams.map(team => {
+                      const members = people.filter(p => p.team_id === team.id)
+                      const selectedCount = members.filter(p => selected.has(p.id)).length
+                      const allSelected = members.length > 0 && selectedCount === members.length
+                      return (
+                        <div
+                          key={team.id}
+                          className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${
+                            allSelected ? 'border-brand-200 bg-brand-50' : 'border-gray-200 bg-white'
+                          }`}
+                        >
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{team.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {members.length === 0
+                                ? 'No members assigned'
+                                : `${members.length} member${members.length !== 1 ? 's' : ''}${selectedCount > 0 && !allSelected ? ` · ${selectedCount} selected` : ''}`}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleTeam(team.id)}
+                            disabled={members.length === 0}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                              allSelected
+                                ? 'bg-brand-500 text-white border-brand-500 hover:bg-brand-600'
+                                : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'
+                            }`}
+                          >
+                            {allSelected ? '✓ All selected' : selectedCount > 0 ? 'Select all' : 'Select all'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                    {selected.size > 0 && (
+                      <p className="text-xs text-gray-500 pt-1">
+                        {selected.size} participant{selected.size !== 1 ? 's' : ''} selected across all teams. Switch to "Pick existing" to review or adjust individual selections.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Paste new */}
             {tab === 'paste' && (
               <>
                 <p className="text-sm text-gray-500">

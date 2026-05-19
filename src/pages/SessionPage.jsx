@@ -45,6 +45,7 @@ export default function SessionPage() {
   const [addTab, setAddTab] = useState('existing')
   const [addSearch, setAddSearch] = useState('')
   const [addSelected, setAddSelected] = useState(new Set())
+  const [teams, setTeams] = useState([])
   const [pasteText, setPasteText] = useState('')
   const [pasteErrors, setPasteErrors] = useState([])
 
@@ -79,8 +80,9 @@ export default function SessionPage() {
     setPasteText('')
     setPasteErrors([])
     setSaveError(null)
-    // Load people for the picker
+    // Load people and teams for the picker
     supabase.from('people').select('*').order('name').then(({ data }) => setPeople(data ?? []))
+    supabase.from('teams').select('*').order('name').then(({ data }) => setTeams(data ?? []))
     setEditing(true)
   }
 
@@ -113,12 +115,35 @@ export default function SessionPage() {
   // People already in this session (by email) — exclude from picker
   const existingEmails = new Set(participants.map(p => p.email))
 
-  const filteredPeople = people.filter(p =>
-    !existingEmails.has(p.email) &&
-    (p.name.toLowerCase().includes(addSearch.toLowerCase()) ||
-     p.email.toLowerCase().includes(addSearch.toLowerCase()) ||
-     (p.top5 ?? []).some(s => s.toLowerCase().includes(addSearch.toLowerCase())))
-  )
+  const teamMap = {}
+  teams.forEach(t => { teamMap[t.id] = t })
+
+  const filteredPeople = people.filter(p => {
+    if (existingEmails.has(p.email)) return false
+    const teamName = p.team_id ? (teamMap[p.team_id]?.name ?? '') : ''
+    const q = addSearch.toLowerCase()
+    return (
+      p.name.toLowerCase().includes(q) ||
+      p.email.toLowerCase().includes(q) ||
+      (p.top5 ?? []).some(s => s.toLowerCase().includes(q)) ||
+      teamName.toLowerCase().includes(q)
+    )
+  })
+
+  function toggleTeamAdd(teamId) {
+    const members = people.filter(p => p.team_id === teamId && !existingEmails.has(p.email))
+    if (members.length === 0) return
+    const allSelected = members.every(p => addSelected.has(p.id))
+    setAddSelected(prev => {
+      const next = new Set(prev)
+      if (allSelected) {
+        members.forEach(p => next.delete(p.id))
+      } else {
+        members.forEach(p => next.add(p.id))
+      }
+      return next
+    })
+  }
 
   async function handleSave() {
     const prompts = editPromptsText.split('\n').map(s => s.trim()).filter(Boolean)
@@ -776,6 +801,13 @@ export default function SessionPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setAddTab('team')}
+                className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'team' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                Pick a team
+              </button>
+              <button
+                type="button"
                 onClick={() => setAddTab('paste')}
                 className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'paste' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
               >
@@ -785,7 +817,7 @@ export default function SessionPage() {
           </div>
 
           {addTab === 'existing' && (
-            filteredPeople.length === 0 ? (
+            filteredPeople.length === 0 && !addSearch ? (
               <p className="text-sm text-gray-400 py-2">All participants in your address book are already in this session.</p>
             ) : (
               <>
@@ -793,7 +825,7 @@ export default function SessionPage() {
                   type="search"
                   value={addSearch}
                   onChange={e => setAddSearch(e.target.value)}
-                  placeholder="Search by name, email, or strength…"
+                  placeholder="Search by name, email, strength, or team…"
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
                 <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
@@ -811,14 +843,68 @@ export default function SessionPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900">{p.name}</p>
                         <p className="text-xs text-gray-400">{p.email}</p>
+                        {p.team_id && teamMap[p.team_id] && (
+                          <p className="text-xs text-indigo-500 mt-0.5">{teamMap[p.team_id].name}</p>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-1 justify-end">
                         {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
                       </div>
                     </label>
                   ))}
+                  {filteredPeople.length === 0 && addSearch && (
+                    <p className="text-sm text-gray-400 px-4 py-4 text-center">No results.</p>
+                  )}
                 </div>
               </>
+            )
+          )}
+
+          {addTab === 'team' && (
+            teams.length === 0 ? (
+              <p className="text-sm text-gray-400 py-2">No teams yet. Visit the Participants page to create teams.</p>
+            ) : (
+              <div className="space-y-2">
+                {teams.map(team => {
+                  const members = people.filter(p => p.team_id === team.id && !existingEmails.has(p.email))
+                  const selectedCount = members.filter(p => addSelected.has(p.id)).length
+                  const allSelected = members.length > 0 && selectedCount === members.length
+                  return (
+                    <div
+                      key={team.id}
+                      className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${
+                        allSelected ? 'border-brand-200 bg-brand-50' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{team.name}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {members.length === 0
+                            ? 'All members already in session'
+                            : `${members.length} member${members.length !== 1 ? 's' : ''}${selectedCount > 0 && !allSelected ? ` · ${selectedCount} selected` : ''}`}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleTeamAdd(team.id)}
+                        disabled={members.length === 0}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                          allSelected
+                            ? 'bg-brand-500 text-white border-brand-500 hover:bg-brand-600'
+                            : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'
+                        }`}
+                      >
+                        {allSelected ? '✓ All selected' : 'Select all'}
+                      </button>
+                    </div>
+                  )
+                })}
+                {addSelected.size > 0 && (
+                  <p className="text-xs text-gray-500 pt-1">
+                    {addSelected.size} participant{addSelected.size !== 1 ? 's' : ''} selected. Switch to "Pick existing" to review or adjust individual selections.
+                  </p>
+                )}
+              </div>
             )
           )}
 
