@@ -26,6 +26,7 @@ export default function NewSessionPage() {
   const [participantsText, setParticipantsText] = useState('')
   const [parseErrors, setParseErrors] = useState([])
 
+  const [teamModal, setTeamModal] = useState(null) // team object or null
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -142,6 +143,59 @@ export default function NewSessionPage() {
 
   return (
     <Layout>
+      {/* Team member picker modal */}
+      {teamModal && (() => {
+        const modalMembers = people.filter(p => p.team_id === teamModal.id)
+        const modalSelected = modalMembers.filter(p => selected.has(p.id)).length
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[75vh]">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-gray-900">{teamModal.name}</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{modalMembers.length} member{modalMembers.length !== 1 ? 's' : ''}</p>
+                </div>
+                <button type="button" onClick={() => setTeamModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              </div>
+              <div className="overflow-y-auto flex-1 divide-y divide-gray-100 px-2 py-1">
+                {modalMembers.map(p => (
+                  <label
+                    key={p.id}
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer rounded-lg transition-colors ${selected.has(p.id) ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggleSelect(p.id)}
+                      className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.email}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1 justify-end">
+                      {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex items-center justify-between">
+                <span className="text-sm text-gray-500">
+                  {modalSelected} of {modalMembers.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTeamModal(null)}
+                  className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <div className="max-w-2xl">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">New Session</h1>
 
@@ -325,18 +379,28 @@ export default function NewSessionPage() {
                                 : `${members.length} member${members.length !== 1 ? 's' : ''}${selectedCount > 0 && !allSelected ? ` · ${selectedCount} selected` : ''}`}
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleTeam(team.id)}
-                            disabled={members.length === 0}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
-                              allSelected
-                                ? 'bg-brand-500 text-white border-brand-500 hover:bg-brand-600'
-                                : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'
-                            }`}
-                          >
-                            {allSelected ? '✓ All selected' : selectedCount > 0 ? 'Select all' : 'Select all'}
-                          </button>
+                              <div className="flex gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setTeamModal(team)}
+                              disabled={members.length === 0}
+                              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-40"
+                            >
+                              Select individuals
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleTeam(team.id)}
+                              disabled={members.length === 0}
+                              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                                allSelected
+                                  ? 'bg-brand-500 text-white border-brand-500 hover:bg-brand-600'
+                                  : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'
+                              }`}
+                            >
+                              {allSelected ? '✓ All selected' : 'Select all'}
+                            </button>
+                          </div>
                         </div>
                       )
                     })}
