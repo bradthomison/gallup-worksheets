@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { useAuth } from '../hooks/useAuth'
@@ -16,19 +16,21 @@ function isActive(session) {
 // ── Mini Calendar ─────────────────────────────────────────────────────────────
 
 function MiniCalendar({ sessions }) {
+  const navigate = useNavigate()
   const now = new Date()
   const [viewDate, setViewDate] = useState(new Date(now.getFullYear(), now.getMonth(), 1))
+  const [multiModal, setMultiModal] = useState(null) // null | { dateLabel, sessions[] }
 
   const year  = viewDate.getFullYear()
   const month = viewDate.getMonth()
   const td    = todayStr()
 
-  // Build per-date sets for dot colouring
-  const futureDates = new Set()
-  const pastDates   = new Set()
+  // Build dateMap: { [dateStr]: session[] }
+  const dateMap = {}
   sessions.forEach(s => {
     if (!s.date || s.archived) return
-    ;(s.date >= td ? futureDates : pastDates).add(s.date)
+    if (!dateMap[s.date]) dateMap[s.date] = []
+    dateMap[s.date].push(s)
   })
 
   const firstDow    = new Date(year, month, 1).getDay()
@@ -37,67 +39,116 @@ function MiniCalendar({ sessions }) {
 
   const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
+  function handleDayClick(ds, daySessions) {
+    if (!daySessions || daySessions.length === 0) return
+    if (daySessions.length === 1) {
+      navigate(`/sessions/${daySessions[0].id}`)
+    } else {
+      const label = parseLocalDate(ds)?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) ?? ds
+      setMultiModal({ dateLabel: label, sessions: daySessions })
+    }
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-6">
-      {/* Month nav */}
-      <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={() => setViewDate(new Date(year, month - 1, 1))}
-          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 rounded transition-colors font-bold"
-        >‹</button>
-        <p className="text-sm font-semibold text-gray-800">{monthLabel}</p>
-        <button
-          onClick={() => setViewDate(new Date(year, month + 1, 1))}
-          className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 rounded transition-colors font-bold"
-        >›</button>
+    <>
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-6">
+        {/* Month nav */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setViewDate(new Date(year, month - 1, 1))}
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 rounded transition-colors font-bold"
+          >‹</button>
+          <p className="text-sm font-semibold text-gray-800">{monthLabel}</p>
+          <button
+            onClick={() => setViewDate(new Date(year, month + 1, 1))}
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 rounded transition-colors font-bold"
+          >›</button>
+        </div>
+
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 text-center mb-1">
+          {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+            <div key={d} className="text-[10px] font-medium text-gray-400">{d}</div>
+          ))}
+        </div>
+
+        {/* Day cells */}
+        <div className="grid grid-cols-7 text-center">
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} />
+            const ds         = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const isToday    = now.getFullYear() === year && now.getMonth() === month && now.getDate() === day
+            const daySessions = dateMap[ds]
+            const hasFut     = daySessions?.some(s => s.date >= td)
+            const hasPast    = daySessions?.some(s => s.date < td)
+            const hasBrandBg = isToday || hasFut
+            const hasGrayBg  = !hasBrandBg && hasPast
+            const clickable  = daySessions && daySessions.length > 0
+
+            return (
+              <div key={i} className="flex items-center justify-center py-0.5">
+                <span
+                  onClick={() => clickable && handleDayClick(ds, daySessions)}
+                  className={`text-xs w-7 h-7 flex items-center justify-center rounded-md select-none
+                    ${hasBrandBg ? 'bg-brand-500 text-white font-bold' : ''}
+                    ${hasGrayBg  ? 'bg-gray-200 text-gray-600 font-semibold' : ''}
+                    ${!hasBrandBg && !hasGrayBg ? 'text-gray-700' : ''}
+                    ${clickable  ? 'cursor-pointer hover:opacity-75 transition-opacity' : ''}`}
+                >
+                  {day}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="w-3.5 h-3.5 bg-brand-500 rounded-md shrink-0" />
+            Upcoming session
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="w-3.5 h-3.5 bg-gray-200 rounded-md shrink-0" />
+            Past session
+          </div>
+        </div>
       </div>
 
-      {/* Day-of-week headers */}
-      <div className="grid grid-cols-7 text-center mb-1">
-        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
-          <div key={d} className="text-[10px] font-medium text-gray-400">{d}</div>
-        ))}
-      </div>
-
-      {/* Day cells */}
-      <div className="grid grid-cols-7 text-center">
-        {cells.map((day, i) => {
-          if (!day) return <div key={i} />
-          const ds      = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-          const isToday = now.getFullYear() === year && now.getMonth() === month && now.getDate() === day
-          const hasFut  = futureDates.has(ds)
-          const hasPast = pastDates.has(ds)
-          const hasDot  = hasFut || hasPast
-
-          return (
-            <div key={i} className="flex items-center justify-center py-0.5">
-              <span className={`relative text-xs w-7 h-7 flex items-center justify-center rounded-full
-                ${isToday ? 'bg-brand-500 text-white font-bold' : hasFut ? 'text-brand-600 font-semibold' : 'text-gray-700'}`}
-              >
-                {day}
-                {hasDot && (
-                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full
-                    ${isToday ? 'bg-white' : hasFut ? 'bg-brand-500' : 'bg-gray-300'}`}
-                  />
-                )}
-              </span>
+      {/* Multi-session picker modal */}
+      {multiModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setMultiModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 w-80 max-w-full mx-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-gray-800 mb-1">Sessions on</p>
+            <p className="text-base font-bold text-gray-900 mb-4">{multiModal.dateLabel}</p>
+            <div className="space-y-2">
+              {multiModal.sessions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => { setMultiModal(null); navigate(`/sessions/${s.id}`) }}
+                  className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-brand-500 hover:bg-brand-50 transition-colors"
+                >
+                  <p className="text-sm font-semibold text-gray-900">{s.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{s.participants?.length ?? 0} participant{(s.participants?.length ?? 0) !== 1 ? 's' : ''}</p>
+                </button>
+              ))}
             </div>
-          )
-        })}
-      </div>
-
-      {/* Legend */}
-      <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="w-1.5 h-1.5 bg-brand-500 rounded-full shrink-0" />
-          Upcoming session
+            <button
+              onClick={() => setMultiModal(null)}
+              className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <span className="w-1.5 h-1.5 bg-gray-300 rounded-full shrink-0" />
-          Past session
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }
 
