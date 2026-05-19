@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { useProfile } from '../hooks/useProfile'
+import SiteFooter from './SiteFooter'
 
 export default function Layout({ children }) {
   const navigate = useNavigate()
@@ -33,7 +34,7 @@ export default function Layout({ children }) {
   const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? ''
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <Link to="/">
@@ -94,9 +95,10 @@ export default function Layout({ children }) {
           </div>
         </div>
       </header>
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {children}
       </main>
+      <SiteFooter />
     </div>
   )
 }

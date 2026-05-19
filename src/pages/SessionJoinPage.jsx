@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getWorksheetPDFBlob, downloadAllSessionPDFs } from '../lib/downloadWorksheetPDF'
+import SiteFooter from '../components/SiteFooter'
 
 export default function SessionJoinPage() {
   const { sessionId } = useParams()
@@ -138,7 +139,7 @@ export default function SessionJoinPage() {
   const completedCount = participants.filter(p => p._submitted).length
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="max-w-lg mx-auto px-4 py-12">
 
         {/* Header */}
@@ -262,6 +263,7 @@ export default function SessionJoinPage() {
           )}
         </div>
       </div>
+      <SiteFooter />
     </div>
   )
 }

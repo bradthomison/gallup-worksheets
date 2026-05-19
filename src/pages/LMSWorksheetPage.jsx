@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import StrengthBadge from '../components/StrengthBadge'
 import { getStrengthColors } from '../lib/strengthColors'
 import { getWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
+import SiteFooter from '../components/SiteFooter'
 
 export default function LMSWorksheetPage() {
   const { slug } = useParams()
@@ -130,7 +131,7 @@ export default function LMSWorksheetPage() {
   const strengths = participant.top5 ?? []
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
@@ -263,6 +264,7 @@ export default function LMSWorksheetPage() {
           </div>
         </form>
       )}
+      <SiteFooter />
     </div>
   )
 }

@@ -214,13 +214,43 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
   const pageCount = doc.internal.getNumberOfPages()
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i)
-    doc.setFontSize(8)
-    doc.setTextColor(180, 180, 180)
     doc.setFont('helvetica', 'normal')
+    doc.setTextColor(170, 170, 170)
+
+    // Thin separator line above footer
+    doc.setDrawColor(210, 210, 210)
+    doc.line(20, pageHeight - 46, pageWidth - 20, pageHeight - 46)
+
+    // Line 1 — left: Cascade copyright | right: Gallup trademark
+    doc.setFontSize(6)
+    doc.text(
+      'Cascade © 2021 Releasing Strengths Ltd. All rights reserved.',
+      20,
+      pageHeight - 36,
+      { align: 'left' }
+    )
+    doc.text(
+      'Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc. All rights reserved.',
+      pageWidth - 20,
+      pageHeight - 36,
+      { align: 'right' }
+    )
+
+    // Line 2 — center: KUMC
+    doc.text(
+      'All training materials are used with permission or created by Rural Health Education and Services at the University of Kansas Medical Center. © 2026. All rights reserved.',
+      pageWidth / 2,
+      pageHeight - 26,
+      { align: 'center' }
+    )
+
+    // Line 3 — center: page info
+    doc.setFontSize(7)
+    doc.setTextColor(190, 190, 190)
     doc.text(
       `${participant.name} · ${session.title} · Page ${i} of ${pageCount}`,
       pageWidth / 2,
-      pageHeight - 12,
+      pageHeight - 14,
       { align: 'center' }
     )
   }
