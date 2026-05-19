@@ -81,7 +81,7 @@ function MiniCalendar({ sessions }) {
             const daySessions = dateMap[ds]
             const hasFut     = daySessions?.some(s => s.date >= td)
             const hasPast    = daySessions?.some(s => s.date < td)
-            const hasBrandBg = isToday || hasFut
+            const hasBrandBg = hasFut
             const hasGrayBg  = !hasBrandBg && hasPast
             const clickable  = daySessions && daySessions.length > 0
 
@@ -90,9 +90,10 @@ function MiniCalendar({ sessions }) {
                 <span
                   onClick={() => clickable && handleDayClick(ds, daySessions)}
                   className={`text-xs w-7 h-7 flex items-center justify-center rounded-md select-none
-                    ${hasBrandBg ? 'bg-brand-500 text-white font-bold' : ''}
+                    ${hasBrandBg ? 'bg-brand-500 text-white font-semibold' : ''}
                     ${hasGrayBg  ? 'bg-gray-200 text-gray-600 font-semibold' : ''}
                     ${!hasBrandBg && !hasGrayBg ? 'text-gray-700' : ''}
+                    ${isToday    ? 'ring-2 ring-brand-500 ring-offset-1' : ''}
                     ${clickable  ? 'cursor-pointer hover:opacity-75 transition-opacity' : ''}`}
                 >
                   {day}
