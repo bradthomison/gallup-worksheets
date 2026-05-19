@@ -60,40 +60,94 @@ serve(async (req) => {
         ? `Sent by your Gallup Strengths coach <strong>${coachName}</strong>`
         : `Sent by your Gallup Strengths coach`
 
+      const sessionDateLine = session.date
+        ? `<br/>Session date: ${new Date(session.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+        : ''
+
       const html = `
 <!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:Inter,ui-sans-serif,system-ui,sans-serif;">
-  <div style="max-width:560px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);">
-    <!-- Header -->
-    <div style="background:#3b5bdb;padding:24px 32px;">
-      <p style="margin:0;font-size:12px;color:#bfdbfe;text-transform:uppercase;letter-spacing:.08em;">Gallup Strengths</p>
-      <h1 style="margin:6px 0 0;font-size:22px;color:#fff;font-weight:700;">${session.title}</h1>
-    </div>
-    <!-- Body -->
-    <div style="padding:32px;">
-      <p style="margin:0;font-size:15px;color:#111827;">Hi ${firstName},</p>
-      <p style="margin:12px 0 24px;font-size:14px;color:#111827;line-height:1.6;">
-        Your coach has prepared a Gallup Strengths worksheet for you. Click the button below to open your personal worksheet and share your reflections.
-      </p>
-      <!-- CTA Button -->
-      <div style="text-align:center;margin:28px 0;">
-        <a href="${worksheetUrl}"
-           style="display:inline-block;background:#3b5bdb;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:.01em;">
-          Open My Worksheet →
-        </a>
-      </div>
-      <p style="margin:24px 0 0;font-size:12px;color:#111827;text-align:center;line-height:1.6;">
-        This link is personal to you — please don't share it.<br/>
-        ${session.date ? `Session date: ${new Date(session.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}` : ''}
-      </p>
-    </div>
-    <!-- Footer -->
-    <div style="padding:16px 32px;border-top:1px solid #f3f4f6;background:#f9fafb;">
-      <p style="margin:0;font-size:12px;color:#111827;">${coachLine}</p>
-    </div>
-  </div>
+<html lang="en" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:v="urn:schemas-microsoft-com:vml">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <!--[if mso]>
+  <xml><o:OfficeDocumentSettings><o:AllowPNG/><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+  <![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+
+      <!-- Card -->
+      <table role="presentation" width="560" border="0" cellpadding="0" cellspacing="0"
+             style="max-width:560px;width:100%;background-color:#ffffff;border:1px solid #e5e7eb;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color:#3b5bdb;padding:24px 32px;">
+            <p style="margin:0;font-size:11px;color:#bfdbfe;font-family:Arial,Helvetica,sans-serif;text-transform:uppercase;letter-spacing:.08em;">Gallup Strengths</p>
+            <h1 style="margin:6px 0 0;font-size:22px;color:#ffffff;font-weight:700;font-family:Arial,Helvetica,sans-serif;line-height:1.3;">
+              ${session.title}
+            </h1>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px;">
+            <p style="margin:0;font-size:15px;color:#111827;font-family:Arial,Helvetica,sans-serif;">Hi ${firstName},</p>
+            <p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
+              Your coach has prepared a Gallup Strengths worksheet for you.
+              Click the button below to open your personal worksheet and share your reflections.
+            </p>
+
+            <!-- CTA button — VML for Outlook, standard anchor for everyone else -->
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td align="center" style="padding:28px 0 0;">
+                  <!--[if mso]>
+                  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml"
+                    href="${worksheetUrl}"
+                    style="height:46px;v-text-anchor:middle;width:224px;"
+                    arcsize="12%" stroke="f" fillcolor="#3b5bdb">
+                    <w:anchorlock/>
+                    <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;">
+                      Open My Worksheet
+                    </center>
+                  </v:roundrect>
+                  <![endif]-->
+                  <!--[if !mso]><!-->
+                  <a href="${worksheetUrl}"
+                     style="display:inline-block;background-color:#3b5bdb;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;line-height:46px;padding:0 28px;text-decoration:none;border-radius:8px;">
+                    Open My Worksheet &rarr;
+                  </a>
+                  <!--<![endif]-->
+                </td>
+              </tr>
+            </table>
+
+            <!-- Small print -->
+            <p style="margin:24px 0 0;font-size:12px;color:#6b7280;text-align:center;line-height:1.6;font-family:Arial,Helvetica,sans-serif;">
+              This link is personal to you &mdash; please don&rsquo;t share it.${sessionDateLine}
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:16px 32px;border-top:1px solid #f3f4f6;background-color:#f9fafb;">
+            <p style="margin:0;font-size:12px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">${coachLine}</p>
+          </td>
+        </tr>
+
+      </table>
+      <!-- /Card -->
+
+    </td>
+  </tr>
+</table>
 </body>
 </html>`
 
