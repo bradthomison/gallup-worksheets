@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getWorksheetPDFBlob, downloadAllSessionPDFs } from '../lib/downloadWorksheetPDF'
 import SiteFooter from '../components/SiteFooter'
+import { formatDateLong } from '../lib/dateUtils'
 
 export default function SessionJoinPage() {
   const { sessionId } = useParams()
@@ -114,7 +115,7 @@ export default function SessionJoinPage() {
   }
 
   function formatDate(d) {
-    return new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    return formatDateLong(d)
   }
 
   if (loading) {

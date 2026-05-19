@@ -7,6 +7,7 @@ import { STRENGTH_DOMAIN } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { useAuth } from '../hooks/useAuth'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
+import { formatDateShort } from '../lib/dateUtils'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -372,7 +373,7 @@ function PersonWorksheetPanel({ person, onClose }) {
                 {sessionWs.map(ws => {
                   const sess = ws.sessions
                   const label = sess
-                    ? `${sess.title}${sess.date ? ` · ${new Date(sess.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}`
+                    ? `${sess.title}${sess.date ? ` · ${formatDateShort(sess.date)}` : ''}`
                     : 'Unknown session'
                   const status = statusInfo(ws.responses)
                   const act = wsAction(ws.id)

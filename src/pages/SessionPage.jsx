@@ -7,6 +7,7 @@ import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
 import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
 import { useAuth } from '../hooks/useAuth'
+import { formatDateLong } from '../lib/dateUtils'
 
 export default function SessionPage() {
   const { id } = useParams()
@@ -21,6 +22,7 @@ export default function SessionPage() {
   const [viewing, setViewing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [confirmArchive, setConfirmArchive] = useState(false)
   const [batchDownloading, setBatchDownloading] = useState(false)
   const [batchProgress, setBatchProgress] = useState(null)
   const [blankDownloading, setBlankDownloading] = useState(false)
@@ -359,6 +361,17 @@ export default function SessionPage() {
     navigate('/')
   }
 
+  async function handleArchive(archive) {
+    const { data: updated } = await supabase
+      .from('sessions')
+      .update({ archived: archive })
+      .eq('id', id)
+      .select()
+      .single()
+    if (updated) setSession(updated)
+    setConfirmArchive(false)
+  }
+
   if (loading) return <Layout><p className="text-gray-500 text-sm">Loading…</p></Layout>
   if (!session) return <Layout><p className="text-red-500 text-sm">Session not found.</p></Layout>
 
@@ -547,7 +560,7 @@ export default function SessionPage() {
               <h1 className="text-2xl font-bold text-gray-900">{session.title}</h1>
               {session.date && (
                 <p className="text-sm text-gray-500 mt-1">
-                  {new Date(session.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  {formatDateLong(session.date)}
                 </p>
               )}
             </>
@@ -648,6 +661,30 @@ export default function SessionPage() {
                 onClick={startEditing}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
               >Edit</button>
+
+              {/* Archive / Unarchive */}
+              {session.archived ? (
+                <button
+                  onClick={() => handleArchive(false)}
+                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
+                >Unarchive</button>
+              ) : confirmArchive ? (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50">
+                  <span className="text-amber-700 font-medium whitespace-nowrap">Archive?</span>
+                  <button
+                    onClick={() => handleArchive(true)}
+                    className="font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded transition-colors"
+                  >Yes</button>
+                  <button onClick={() => setConfirmArchive(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmArchive(true)}
+                  className="px-3 py-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                >Archive</button>
+              )}
+
+              {/* Delete */}
               {confirmDelete ? (
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50">
                   <span className="text-red-700 font-medium whitespace-nowrap">Delete?</span>
