@@ -32,6 +32,8 @@ export default function SessionPage() {
   const [linksSentCount, setLinksSentCount] = useState(null)
   const [selectRecipientsModal, setSelectRecipientsModal] = useState(false)
   const [selectedRecipients, setSelectedRecipients] = useState(new Set())
+  const [sendingLinkId, setSendingLinkId] = useState(null)
+  const [sentLinkId, setSentLinkId] = useState(null)
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -252,6 +254,15 @@ export default function SessionPage() {
       setLinksSentCount(data.sent)
       setTimeout(() => setLinksSentCount(null), 4000)
     }
+  }
+
+  async function sendLinkTo(participantId) {
+    setSendingLinkId(participantId)
+    const body = { session_id: id, app_origin: window.location.origin, participant_ids: [participantId] }
+    await supabase.functions.invoke('send-worksheet-links', { body })
+    setSendingLinkId(null)
+    setSentLinkId(participantId)
+    setTimeout(() => setSentLinkId(null), 3000)
   }
 
   function openSelectRecipients() {
@@ -865,6 +876,14 @@ export default function SessionPage() {
                             title="Download blank print-ready worksheet"
                           >
                             ↓ Blank
+                          </button>
+                          <button
+                            onClick={() => sendLinkTo(p.id)}
+                            disabled={sendingLinkId === p.id}
+                            className="shrink-0 text-xs text-gray-400 hover:text-brand-500 disabled:opacity-50 transition-colors"
+                            title="Email this participant their worksheet link"
+                          >
+                            {sentLinkId === p.id ? '✓ Sent' : sendingLinkId === p.id ? '…' : '✉ Send'}
                           </button>
                         </div>
                       )}
