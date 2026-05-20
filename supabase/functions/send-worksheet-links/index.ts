@@ -50,8 +50,10 @@ serve(async (req) => {
     const resendKey = Deno.env.get('RESEND_API_KEY')
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
     const rawFrom = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
-    // If the address doesn't already have a display name, add one
-    const fromAddress = rawFrom.includes('<') ? rawFrom : `Cascade Strengths <${rawFrom}>`
+    const senderName = coachName ? `Strengths Coach ${coachName}` : 'Strengths Coach'
+    // Strip any existing display name from the address before wrapping
+    const emailOnly = rawFrom.includes('<') ? rawFrom.match(/<(.+)>/)?.[1] ?? rawFrom : rawFrom
+    const fromAddress = `${senderName} <${emailOnly}>`
 
     let sent = 0
     for (const p of participants ?? []) {
