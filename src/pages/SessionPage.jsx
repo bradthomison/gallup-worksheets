@@ -855,36 +855,40 @@ export default function SessionPage() {
                           {removed ? 'Undo' : 'Remove'}
                         </button>
                       ) : (
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <a
-                            href={worksheetUrl(p.worksheet_url_slug)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-brand-500 hover:underline truncate max-w-[160px]"
-                          >
-                            /worksheet/{p.worksheet_url_slug.slice(0, 8)}…
-                          </a>
-                          <button
-                            onClick={() => copyUrl(p.worksheet_url_slug, p.id)}
-                            className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
-                          >
-                            {copied === p.id ? '✓ Copied' : 'Copy'}
-                          </button>
-                          <button
-                            onClick={() => downloadBlankWorksheetPDF(p, session)}
-                            className="shrink-0 text-xs text-gray-400 hover:text-brand-500 transition-colors"
-                            title="Download blank print-ready worksheet"
-                          >
-                            ↓ Blank
-                          </button>
-                          <button
-                            onClick={() => sendLinkTo(p.id)}
-                            disabled={sendingLinkId === p.id}
-                            className="shrink-0 text-xs text-gray-400 hover:text-brand-500 disabled:opacity-50 transition-colors"
-                            title="Email this participant their worksheet link"
-                          >
-                            {sentLinkId === p.id ? '✓ Sent' : sendingLinkId === p.id ? '…' : '✉ Send'}
-                          </button>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={worksheetUrl(p.worksheet_url_slug)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-brand-500 hover:underline truncate max-w-[160px]"
+                            >
+                              /worksheet/{p.worksheet_url_slug.slice(0, 8)}…
+                            </a>
+                            <button
+                              onClick={() => copyUrl(p.worksheet_url_slug, p.id)}
+                              className="shrink-0 text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                            >
+                              {copied === p.id ? '✓ Copied' : 'Copy'}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => downloadBlankWorksheetPDF(p, session)}
+                              className="text-xs text-gray-400 hover:text-brand-500 transition-colors"
+                              title="Download blank print-ready worksheet"
+                            >
+                              ↓ Blank
+                            </button>
+                            <button
+                              onClick={() => sendLinkTo(p.id)}
+                              disabled={sendingLinkId === p.id}
+                              className="text-xs text-gray-400 hover:text-brand-500 disabled:opacity-50 transition-colors"
+                              title="Email this participant their worksheet link"
+                            >
+                              {sentLinkId === p.id ? '✓ Sent' : sendingLinkId === p.id ? '…' : '✉ Send'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </td>
