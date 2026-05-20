@@ -49,7 +49,9 @@ serve(async (req) => {
     )
     const resendKey = Deno.env.get('RESEND_API_KEY')
     if (!resendKey) throw new Error('RESEND_API_KEY secret not set')
-    const fromAddress = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
+    const rawFrom = Deno.env.get('RESEND_FROM_ADDRESS') ?? 'onboarding@resend.dev'
+    // If the address doesn't already have a display name, add one
+    const fromAddress = rawFrom.includes('<') ? rawFrom : `Cascade Strengths <${rawFrom}>`
 
     let sent = 0
     for (const p of participants ?? []) {
@@ -139,6 +141,10 @@ serve(async (req) => {
         <tr>
           <td style="padding:16px 32px;border-top:1px solid #f3f4f6;background-color:#f9fafb;">
             <p style="margin:0;font-size:12px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">${coachLine}</p>
+            <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;font-family:Arial,Helvetica,sans-serif;">
+              You received this because you are a participant in this Gallup Strengths session.
+              If you believe this was sent in error, please disregard it.
+            </p>
           </td>
         </tr>
 
