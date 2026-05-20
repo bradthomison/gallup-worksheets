@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import StrengthBadge from '../components/StrengthBadge'
@@ -19,6 +19,8 @@ export default function WorksheetPage() {
   const [savedAt, setSavedAt] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [dirty, setDirty] = useState(false)
+  const autoSaveTimer = useRef(null)
 
   useEffect(() => {
     async function load() {
@@ -53,7 +55,33 @@ export default function WorksheetPage() {
 
   function handleCellChange(promptIdx, strengthIdx, value) {
     setCells(prev => ({ ...prev, [`${promptIdx}_${strengthIdx}`]: value }))
+    setDirty(true)
   }
+
+  // Auto-save: 2 seconds after last change
+  useEffect(() => {
+    if (!dirty || !participant || submitted) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      handleSaveDraft()
+      setDirty(false)
+    }, 2000)
+    return () => clearTimeout(autoSaveTimer.current)
+  }, [cells, dirty])
+
+  // Save immediately when tab is hidden (user switches away or closes)
+  useEffect(() => {
+    if (!participant || submitted) return
+    function handleVisibility() {
+      if (document.visibilityState === 'hidden') {
+        if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+        handleSaveDraft()
+        setDirty(false)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [cells, participant, submitted])
 
   function buildRows(submittedAt = null) {
     const prompts = session.prompts ?? []
@@ -195,7 +223,7 @@ export default function WorksheetPage() {
               Your Strengths Worksheet{session.theme_name ? `: ${session.theme_name}` : ''}
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Fill in each cell with your reflections. Take your time — your progress is not saved until you submit.
+              Fill in each cell with your reflections. Your progress auto-saves as you type.
             </p>
           </div>
 
@@ -267,9 +295,13 @@ export default function WorksheetPage() {
               {saving ? 'Saving…' : 'Save & Finish Later'}
             </button>
             <div className="text-xs text-gray-400">
-              {savedAt
-                ? <span className="text-green-600">✓ Progress saved at {savedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-                : 'Progress is not saved until you click Save or Submit.'}
+              {saving
+                ? <span className="text-gray-400">Saving…</span>
+                : savedAt
+                  ? <span className="text-green-600">✓ Saved at {savedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                  : dirty
+                    ? <span className="text-gray-400">Saving…</span>
+                    : 'Progress auto-saves as you type.'}
             </div>
           </div>
         </form>
