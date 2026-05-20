@@ -239,7 +239,7 @@ serve(async (req) => {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          from: fromAddress,
+          from: `${participant.name} <${emailOnly}>`,
           to: coachUser.email,
           reply_to: `${participant.name} <${participant.email}>`,
           subject: `New submission: ${participant.name} — ${session.title}`,
