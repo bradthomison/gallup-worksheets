@@ -210,7 +210,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: fromAddress,
         to: participant.email,
-        subject: `Your Strengths Worksheet &mdash; ${session.title}`,
+        subject: `Your Strengths Worksheet — ${session.title}`,
         html: participantHtml,
         ...(attachments.length > 0 ? { attachments } : {}),
       }),
@@ -241,7 +241,8 @@ serve(async (req) => {
         body: JSON.stringify({
           from: fromAddress,
           to: coachUser.email,
-          subject: `New submission: ${participant.name} &mdash; ${session.title}`,
+          reply_to: `${participant.name} <${participant.email}>`,
+          subject: `New submission: ${participant.name} — ${session.title}`,
           html: coachHtml,
           ...(attachments.length > 0 ? { attachments } : {}),
         }),
