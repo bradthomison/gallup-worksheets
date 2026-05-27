@@ -8,6 +8,7 @@ import { parseParticipants } from '../lib/parseParticipants'
 import { useAuth } from '../hooks/useAuth'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import { formatDateShort } from '../lib/dateUtils'
+import ResponseViewerModal from '../components/ResponseViewerModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -249,6 +250,7 @@ function PersonWorksheetPanel({ person, onClose }) {
   const [lmsDeleteConfirm, setLmsDeleteConfirm] = useState(null)
   const [lmsDeleting, setLmsDeleting] = useState(null)
   const [actionState, setActionState] = useState({}) // { [wsId]: null | 'downloading' | 'copying' | 'sending' | 'sent' | 'copied' }
+  const [viewModal, setViewModal] = useState(null) // { participant, session, responses }
 
   useEffect(() => {
     async function load() {
@@ -338,6 +340,27 @@ function PersonWorksheetPanel({ person, onClose }) {
     setTimeout(() => setWsAction(ws.id, null), 3000)
   }
 
+  async function handleOpenModal(ws, type) {
+    const participantLike = { name: person.name, email: person.email, top5: person.top5 }
+    let sessionLike, fullResponses
+
+    if (type === 'session') {
+      sessionLike = { title: ws.sessions?.title ?? 'Session', prompts: ws.sessions?.prompts ?? [] }
+      const { data } = await supabase.from('responses').select('*').eq('participant_id', ws.id)
+      fullResponses = data ?? []
+    } else {
+      sessionLike = { title: ws.theme?.name ?? 'LMS', prompts: ws.theme?.prompts ?? [] }
+      const { data } = await supabase.from('lms_responses').select('*').eq('lms_worksheet_id', ws.id)
+      fullResponses = data ?? []
+    }
+
+    setViewModal({
+      participant: participantLike,
+      session: sessionLike,
+      responses: fullResponses,
+    })
+  }
+
   async function handleDeleteLmsWs(ws) {
     setLmsDeleting(ws.id)
     await supabase.from('lms_worksheets').delete().eq('id', ws.id)
@@ -351,6 +374,27 @@ function PersonWorksheetPanel({ person, onClose }) {
   const actionBtnBrand = 'text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors'
 
   return (
+    <>
+    {viewModal && (
+      <ResponseViewerModal
+        participant={viewModal.participant}
+        session={viewModal.session}
+        responses={viewModal.responses}
+        onClose={() => setViewModal(null)}
+        onDownloadPDF={() =>
+          getWorksheetPDFBlob(viewModal.participant, viewModal.session, viewModal.responses)
+            .then(blob => {
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = safeName(`${viewModal.participant.name} - ${viewModal.session.title}.pdf`)
+              a.click()
+              URL.revokeObjectURL(url)
+            })
+            .catch(console.error)
+        }
+      />
+    )}
     <div className="bg-blue-50 border-t border-blue-100 px-6 py-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-gray-900">{person.name}'s Worksheets</h3>
@@ -384,14 +428,23 @@ function PersonWorksheetPanel({ person, onClose }) {
                         <span className="text-sm text-gray-700 truncate">{label}</span>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
-                        <a
-                          href={`/worksheet/${ws.worksheet_url_slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={actionBtnBrand}
-                        >
-                          Open
-                        </a>
+                        {status.label === 'Submitted' ? (
+                          <button
+                            onClick={() => handleOpenModal(ws, 'session')}
+                            className={actionBtnBrand}
+                          >
+                            Open
+                          </button>
+                        ) : (
+                          <a
+                            href={`/worksheet/${ws.worksheet_url_slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={actionBtnBrand}
+                          >
+                            Open
+                          </a>
+                        )}
                         <button
                           onClick={() => downloadPDF(ws, 'session')}
                           disabled={act === 'downloading'}
@@ -439,14 +492,23 @@ function PersonWorksheetPanel({ person, onClose }) {
                         <span className="text-sm text-gray-700 truncate">{ws.theme?.name ?? 'Unknown theme'}</span>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
-                        <a
-                          href={`/lms-worksheet/${ws.worksheet_url_slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={actionBtnBrand}
-                        >
-                          Open
-                        </a>
+                        {status.label === 'Submitted' ? (
+                          <button
+                            onClick={() => handleOpenModal(ws, 'lms')}
+                            className={actionBtnBrand}
+                          >
+                            Open
+                          </button>
+                        ) : (
+                          <a
+                            href={`/lms-worksheet/${ws.worksheet_url_slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={actionBtnBrand}
+                          >
+                            Open
+                          </a>
+                        )}
                         <button
                           onClick={() => downloadPDF(ws, 'lms')}
                           disabled={act === 'downloading'}
@@ -489,6 +551,7 @@ function PersonWorksheetPanel({ person, onClose }) {
         </div>
       )}
     </div>
+    </>
   )
 }
 
