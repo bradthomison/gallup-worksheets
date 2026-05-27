@@ -354,11 +354,25 @@ function PersonWorksheetPanel({ person, onClose }) {
       fullResponses = data ?? []
     }
 
-    setViewModal({
-      participant: participantLike,
-      session: sessionLike,
-      responses: fullResponses,
-    })
+    setViewModal({ participant: participantLike, session: sessionLike, responses: fullResponses, ws, type })
+  }
+
+  async function handleUnsubmit() {
+    const { ws, type } = viewModal
+    if (type === 'session') {
+      await supabase.from('responses').update({ submitted_at: null }).eq('participant_id', ws.id)
+      setSessionWs(prev => prev.map(w => w.id === ws.id
+        ? { ...w, responses: (w.responses ?? []).map(r => ({ ...r, submitted_at: null })) }
+        : w
+      ))
+    } else {
+      await supabase.from('lms_responses').update({ submitted_at: null }).eq('lms_worksheet_id', ws.id)
+      setLmsWs(prev => prev.map(w => w.id === ws.id
+        ? { ...w, lms_responses: (w.lms_responses ?? []).map(r => ({ ...r, submitted_at: null })) }
+        : w
+      ))
+    }
+    setViewModal(null)
   }
 
   async function handleDeleteLmsWs(ws) {
@@ -381,6 +395,7 @@ function PersonWorksheetPanel({ person, onClose }) {
         session={viewModal.session}
         responses={viewModal.responses}
         onClose={() => setViewModal(null)}
+        onUnsubmit={handleUnsubmit}
         onDownloadPDF={() =>
           getWorksheetPDFBlob(viewModal.participant, viewModal.session, viewModal.responses)
             .then(blob => {
