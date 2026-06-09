@@ -584,6 +584,7 @@ export default function ParticipantsPage() {
   const [pasteText, setPasteText] = useState('')
   const [pasteErrors, setPasteErrors] = useState([])
   const [pasteSaving, setPasteSaving] = useState(false)
+  const [pasteTeamId, setPasteTeamId] = useState('')
   const [search, setSearch] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [saveError, setSaveError] = useState(null)
@@ -647,7 +648,7 @@ export default function ParticipantsPage() {
     setSaveError(null)
     const { data: { user: u } } = await supabase.auth.getUser()
     const { error } = await supabase.from('people').upsert(
-      parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: u.id })),
+      parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: u.id, team_id: pasteTeamId || null })),
       { onConflict: 'email,created_by' }
     )
     setPasteSaving(false)
@@ -757,6 +758,27 @@ export default function ParticipantsPage() {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
             autoFocus
           />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Assign to team <span className="font-normal text-gray-400">(optional)</span></label>
+            <select
+              value={pasteTeamId}
+              onChange={e => {
+                if (e.target.value === '__new__') {
+                  openAddTeamModal(team => setPasteTeamId(team.id))
+                } else {
+                  setPasteTeamId(e.target.value)
+                }
+              }}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+            >
+              <option value="">No team</option>
+              {teams.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+              <option value="__new__">+ Create new team…</option>
+            </select>
+          </div>
+
           {pasteErrors.length > 0 && (
             <ul className="text-xs text-red-600 space-y-0.5">
               {pasteErrors.map((err, i) => <li key={i}>{err}</li>)}
@@ -776,7 +798,7 @@ export default function ParticipantsPage() {
               {pasteSaving ? 'Saving…' : 'Add Participants'}
             </button>
             <button
-              onClick={() => { setAddingNew(false); setPasteText(''); setPasteErrors([]) }}
+              onClick={() => { setAddingNew(false); setPasteText(''); setPasteErrors([]); setPasteTeamId('') }}
               className="text-gray-500 hover:text-gray-800 font-medium px-4 py-2.5 rounded-lg text-sm transition-colors"
             >
               Cancel
