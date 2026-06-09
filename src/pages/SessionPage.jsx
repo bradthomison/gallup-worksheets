@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import QRCode from 'qrcode'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
@@ -9,6 +10,75 @@ import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPD
 import { useAuth } from '../hooks/useAuth'
 import { formatDateLong } from '../lib/dateUtils'
 
+// ── Group Access Link card with QR code ───────────────────────────────────────
+function GroupAccessLinkCard({ joinUrl, sessionTitle }) {
+  const canvasRef = useRef(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      QRCode.toCanvas(canvasRef.current, joinUrl, { width: 160, margin: 1 })
+    }
+  }, [joinUrl])
+
+  async function copyLink() {
+    await navigator.clipboard.writeText(joinUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  function downloadQR() {
+    QRCode.toDataURL(joinUrl, { width: 600, margin: 2 }, (err, url) => {
+      if (err) return
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${sessionTitle} - QR Code.png`.replace(/[/\\?%*:|"<>]/g, '-')
+      a.click()
+    })
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
+      <div className="flex items-start gap-6">
+        {/* QR code */}
+        <div className="shrink-0 flex flex-col items-center gap-2">
+          <canvas ref={canvasRef} className="rounded-lg border border-gray-100" />
+          <button
+            onClick={downloadQR}
+            className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap w-full text-center"
+          >
+            ↓ Download QR
+          </button>
+        </div>
+
+        {/* Link info */}
+        <div className="min-w-0 flex-1">
+          <h2 className="font-semibold text-gray-900 mb-1">Group Access Link</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Share this link or QR code so participants can find their own worksheet from a dropdown list.
+          </p>
+          <a
+            href={joinUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-brand-500 hover:underline break-all"
+          >
+            {joinUrl}
+          </a>
+          <div className="mt-3">
+            <button
+              onClick={copyLink}
+              className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {copied ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function SessionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -18,7 +88,6 @@ export default function SessionPage() {
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
-  const [copiedJoin, setCopiedJoin] = useState(false)
   const [viewing, setViewing] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -323,12 +392,6 @@ export default function SessionPage() {
 
   function joinUrl() {
     return `${window.location.origin}/session/${id}/join`
-  }
-
-  async function copyJoinUrl() {
-    await navigator.clipboard.writeText(joinUrl())
-    setCopiedJoin(true)
-    setTimeout(() => setCopiedJoin(false), 2000)
   }
 
   async function handleToggleManager(participantId, current) {
@@ -744,30 +807,7 @@ export default function SessionPage() {
 
       {/* Group Access Link */}
       {!editing && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h2 className="font-semibold text-gray-900 mb-1">Group Access Link</h2>
-              <p className="text-xs text-gray-500 mb-2">
-                Share this link so participants can find their own worksheet from a dropdown list.
-              </p>
-              <a
-                href={joinUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-brand-500 hover:underline break-all"
-              >
-                {joinUrl()}
-              </a>
-            </div>
-            <button
-              onClick={copyJoinUrl}
-              className="shrink-0 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-            >
-              {copiedJoin ? '✓ Copied' : 'Copy Link'}
-            </button>
-          </div>
-        </div>
+        <GroupAccessLinkCard joinUrl={joinUrl()} sessionTitle={session.title} />
       )}
 
       {/* Participants */}
