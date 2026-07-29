@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
+import PersonalInsightsModal from '../components/PersonalInsightsModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -589,6 +590,7 @@ export default function ParticipantsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [saveError, setSaveError] = useState(null)
   const [expandedPersonId, setExpandedPersonId] = useState(null)
+  const [insightsModal, setInsightsModal] = useState(null)
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -689,6 +691,12 @@ export default function ParticipantsPage() {
 
   return (
     <Layout>
+      {insightsModal && (
+        <PersonalInsightsModal
+          participant={insightsModal}
+          onClose={() => setInsightsModal(null)}
+        />
+      )}
       {addTeamModal && (
         <AddTeamModal
           onSave={handleTeamCreated}
@@ -905,6 +913,14 @@ export default function ParticipantsPage() {
                               className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
                             >
                               Worksheets {expandedPersonId === p.id ? '↑' : '›'}
+                            </button>
+                          )}
+                          {(p.top5 ?? []).some(Boolean) && (
+                            <button
+                              onClick={() => { setInsightsModal(p); setExpandedPersonId(null) }}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Personal Insights
                             </button>
                           )}
                         </div>

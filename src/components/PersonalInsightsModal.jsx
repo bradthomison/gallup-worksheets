@@ -1,0 +1,142 @@
+import { useRef } from 'react'
+import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
+import { getStrengthColors } from '../lib/strengthColors'
+
+function buildPrintHTML(name, strengths) {
+  const cols = strengths.filter(s => PERSONAL_INSIGHTS[s])
+
+  const headerCells = cols.map(s => {
+    const c = getStrengthColors(s)
+    return `<th style="background:${c.headerBg};color:${c.headerText};padding:8px 6px;font-size:13px;font-weight:700;text-align:center;border:1px solid #e5e7eb;">${s}</th>`
+  }).join('')
+
+  const bodyRows = ROWS.map(row => {
+    if (row.key === 'description') {
+      const cells = cols.map(s => {
+        const text = PERSONAL_INSIGHTS[s]?.description ?? ''
+        return `<td style="padding:8px 6px;font-size:11px;vertical-align:top;border:1px solid #e5e7eb;">${text}</td>`
+      }).join('')
+      return `<tr><th style="padding:8px 6px;font-size:12px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #e5e7eb;min-width:140px;background:#f9fafb;">${name}</th>${cells}</tr>`
+    }
+    const cells = cols.map(s => {
+      const text = PERSONAL_INSIGHTS[s]?.[row.key] ?? ''
+      return `<td style="padding:8px 6px;font-size:11px;vertical-align:top;border:1px solid #e5e7eb;">${text}</td>`
+    }).join('')
+    return `<tr><th style="padding:8px 6px;font-size:12px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #e5e7eb;background:#f9fafb;white-space:nowrap;">${row.label}</th>${cells}</tr>`
+  }).join('')
+
+  return `<!DOCTYPE html><html><head><title>Personal Insights — ${name}</title>
+<style>body{font-family:Arial,sans-serif;margin:20px;}table{border-collapse:collapse;width:100%;}@media print{@page{size:landscape;}}</style>
+</head><body>
+<h2 style="margin-bottom:12px;">Personal Insights — ${name}</h2>
+<table>${'<colgroup><col style="width:140px;">' + cols.map(() => '<col>').join('') + '</colgroup>'}
+<thead><tr><th style="padding:8px 6px;border:1px solid #e5e7eb;background:#f3f4f6;"></th>${headerCells}</tr></thead>
+<tbody>${bodyRows}</tbody></table>
+<p style="margin-top:16px;font-size:10px;color:#888;">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</p>
+</body></html>`
+}
+
+export default function PersonalInsightsModal({ participant, onClose }) {
+  const strengths = (participant.top5 || []).filter(Boolean)
+  const validStrengths = strengths.filter(s => PERSONAL_INSIGHTS[s])
+  const printRef = useRef(null)
+
+  function handlePrint() {
+    const html = buildPrintHTML(participant.name, strengths)
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    win.print()
+  }
+
+  if (strengths.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Personal Insights — {participant.name}</h2>
+          <p className="text-sm text-gray-500">No strengths recorded for this participant. Add their top 5 strengths first.</p>
+          <button onClick={onClose} className="mt-4 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium">Close</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-7xl my-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Personal Insights</h2>
+            <p className="text-sm text-gray-500">{participant.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print / PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-auto p-4" ref={printRef}>
+          <table className="w-full border-collapse text-sm" style={{ minWidth: `${140 + validStrengths.length * 180}px` }}>
+            <colgroup>
+              <col style={{ width: '150px' }} />
+              {validStrengths.map(s => <col key={s} />)}
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="border border-gray-200 bg-gray-50 p-2" />
+                {validStrengths.map(s => {
+                  const c = getStrengthColors(s)
+                  return (
+                    <th
+                      key={s}
+                      className="border border-gray-200 p-2 text-center font-bold"
+                      style={{ background: c.headerBg, color: c.headerText }}
+                    >
+                      {s}
+                    </th>
+                  )
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {ROWS.map(row => (
+                <tr key={row.key} className="even:bg-gray-50/50">
+                  <th className="border border-gray-200 bg-gray-50 p-2 text-left text-xs font-semibold text-gray-700 align-top whitespace-nowrap">
+                    {row.key === 'description' ? participant.name : row.label}
+                  </th>
+                  {validStrengths.map(s => (
+                    <td key={s} className="border border-gray-200 p-2 text-xs text-gray-700 align-top leading-relaxed">
+                      {PERSONAL_INSIGHTS[s]?.[row.key] ?? ''}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400">
+          Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
+        </div>
+      </div>
+    </div>
+  )
+}
