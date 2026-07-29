@@ -10,6 +10,7 @@ import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWo
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import PersonalInsightsModal from '../components/PersonalInsightsModal'
+import PersonalInsightsBulkModal from '../components/PersonalInsightsBulkModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -591,6 +592,7 @@ export default function ParticipantsPage() {
   const [saveError, setSaveError] = useState(null)
   const [expandedPersonId, setExpandedPersonId] = useState(null)
   const [insightsModal, setInsightsModal] = useState(null)
+  const [bulkInsightsModal, setBulkInsightsModal] = useState(false)
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -697,6 +699,13 @@ export default function ParticipantsPage() {
           onClose={() => setInsightsModal(null)}
         />
       )}
+      {bulkInsightsModal && (
+        <PersonalInsightsBulkModal
+          people={people}
+          teams={teams}
+          onClose={() => setBulkInsightsModal(false)}
+        />
+      )}
       {addTeamModal && (
         <AddTeamModal
           onSave={handleTeamCreated}
@@ -733,6 +742,12 @@ export default function ParticipantsPage() {
               className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               + Add Team
+            </button>
+            <button
+              onClick={() => setBulkInsightsModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Personal Insights Reports
             </button>
           </div>
         </div>
@@ -897,32 +912,36 @@ export default function ParticipantsPage() {
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-1.5">
                           {isOwner && (
-                            <button
-                              onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
-                              className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
-                            >
-                              Edit Person
-                            </button>
+                            <div>
+                              <button
+                                onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
+                                className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
+                              >
+                                Edit Person
+                              </button>
+                            </div>
                           )}
-                          {(isOwner || p.shared) && (
-                            <button
-                              onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
-                              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
-                            >
-                              Worksheets {expandedPersonId === p.id ? '↑' : '›'}
-                            </button>
-                          )}
-                          {(p.top5 ?? []).some(Boolean) && (
-                            <button
-                              onClick={() => { setInsightsModal(p); setExpandedPersonId(null) }}
-                              className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
-                            >
-                              Personal Insights
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1.5">
+                            {(p.top5 ?? []).some(Boolean) && (
+                              <button
+                                onClick={() => { setInsightsModal(p); setExpandedPersonId(null) }}
+                                className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
+                              >
+                                Personal Insights
+                              </button>
+                            )}
+                            {(isOwner || p.shared) && (
+                              <button
+                                onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
+                                className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
+                              >
+                                Worksheets {expandedPersonId === p.id ? '↑' : '›'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </td>
                     </tr>

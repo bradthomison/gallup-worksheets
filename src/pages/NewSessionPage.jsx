@@ -39,10 +39,16 @@ export default function NewSessionPage() {
   const teamMap = {}
   teams.forEach(t => { teamMap[t.id] = t })
 
+  const PI_SENTINEL = '__personal_insights__'
+
   function handleThemeChange(e) {
     const id = e.target.value
     setSelectedTheme(id)
-    if (!id) return
+    if (!id) { return }
+    if (id === PI_SENTINEL) {
+      setPromptsText(PI_SENTINEL)
+      return
+    }
     const theme = themes.find(t => t.id === id)
     if (theme) setPromptsText((theme.prompts ?? []).join('\n'))
   }
@@ -101,9 +107,11 @@ export default function NewSessionPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    const themeName = selectedTheme
-      ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
-      : null
+    const themeName = selectedTheme === PI_SENTINEL
+      ? 'Personal Insights'
+      : selectedTheme
+        ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
+        : null
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
@@ -243,6 +251,7 @@ export default function NewSessionPage() {
                     className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                   >
                     <option value="">Choose a theme…</option>
+                    <option value={PI_SENTINEL}>⭐ Personal Insights (Pre-filled Report)</option>
                     {themes.map(t => (
                       <option key={t.id} value={t.id}>{t.name} ({t.prompts?.length ?? 0})</option>
                     ))}
@@ -250,15 +259,24 @@ export default function NewSessionPage() {
                 </div>
               )}
             </div>
-            <textarea
-              value={promptsText}
-              onChange={e => { setPromptsText(e.target.value); setSelectedTheme('') }}
-              rows={6}
-              placeholder={"How does this strength show up for you at work?\nWhat's one way you could lean into this strength more?\nWhere do you see this strength creating value for your team?"}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
-            />
-            {promptList.length > 0 && (
-              <p className="text-xs text-gray-400">{promptList.length} prompt{promptList.length !== 1 ? 's' : ''}</p>
+            {promptsText === PI_SENTINEL ? (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                <p className="font-medium">Personal Insights selected</p>
+                <p className="text-xs mt-0.5 text-emerald-700">Each participant will receive a pre-filled report based on their top 5 strengths. No prompts needed.</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={promptsText}
+                  onChange={e => { setPromptsText(e.target.value); setSelectedTheme('') }}
+                  rows={6}
+                  placeholder={"How does this strength show up for you at work?\nWhat's one way you could lean into this strength more?\nWhere do you see this strength creating value for your team?"}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
+                />
+                {promptList.length > 0 && (
+                  <p className="text-xs text-gray-400">{promptList.length} prompt{promptList.length !== 1 ? 's' : ''}</p>
+                )}
+              </>
             )}
           </div>
 

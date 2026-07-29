@@ -1,53 +1,69 @@
-import { useRef } from 'react'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
 
-function buildPrintHTML(name, strengths) {
+// Builds a standalone print-ready HTML page for one participant
+export function buildPersonalInsightsPrintHTML(name, strengths) {
   const cols = strengths.filter(s => PERSONAL_INSIGHTS[s])
+  const colCount = cols.length + 1
 
   const headerCells = cols.map(s => {
     const c = getStrengthColors(s)
-    return `<th style="background:${c.headerBg};color:${c.headerText};padding:8px 6px;font-size:13px;font-weight:700;text-align:center;border:1px solid #e5e7eb;">${s}</th>`
+    return `<th style="background:${c.headerBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;color:${c.headerText};padding:6px 5px;font-size:12px;font-weight:700;text-align:center;border:1px solid #d1d5db;">${s}</th>`
   }).join('')
 
   const bodyRows = ROWS.map(row => {
-    if (row.key === 'description') {
-      const cells = cols.map(s => {
-        const text = PERSONAL_INSIGHTS[s]?.description ?? ''
-        return `<td style="padding:8px 6px;font-size:11px;vertical-align:top;border:1px solid #e5e7eb;">${text}</td>`
-      }).join('')
-      return `<tr><th style="padding:8px 6px;font-size:12px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #e5e7eb;min-width:140px;background:#f9fafb;">${name}</th>${cells}</tr>`
-    }
+    const labelCell = row.key === 'description'
+      ? `<th style="padding:6px 5px;font-size:11px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #d1d5db;min-width:120px;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${name}</th>`
+      : `<th style="padding:6px 5px;font-size:11px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #d1d5db;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;white-space:nowrap;">${row.label}</th>`
+
     const cells = cols.map(s => {
       const text = PERSONAL_INSIGHTS[s]?.[row.key] ?? ''
-      return `<td style="padding:8px 6px;font-size:11px;vertical-align:top;border:1px solid #e5e7eb;">${text}</td>`
+      return `<td style="padding:6px 5px;font-size:10.5px;vertical-align:top;border:1px solid #d1d5db;">${text}</td>`
     }).join('')
-    return `<tr><th style="padding:8px 6px;font-size:12px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #e5e7eb;background:#f9fafb;white-space:nowrap;">${row.label}</th>${cells}</tr>`
+
+    return `<tr>${labelCell}${cells}</tr>`
   }).join('')
 
   return `<!DOCTYPE html><html><head><title>Personal Insights — ${name}</title>
-<style>body{font-family:Arial,sans-serif;margin:20px;}table{border-collapse:collapse;width:100%;}@media print{@page{size:landscape;}}</style>
+<style>
+*{box-sizing:border-box;}
+body{font-family:Arial,sans-serif;margin:0;padding:8px;}
+h2{font-size:14px;margin:0 0 6px 0;color:#111;}
+table{border-collapse:collapse;width:100%;table-layout:fixed;}
+th,td{word-wrap:break-word;}
+tfoot td{border-top:1px solid #d1d5db;padding:3px 5px;font-size:8.5px;color:#9ca3af;}
+@media print{
+  @page{size:landscape;margin:0.35in;}
+  body{padding:0;}
+  -webkit-print-color-adjust:exact;
+  print-color-adjust:exact;
+}
+</style>
 </head><body>
-<h2 style="margin-bottom:12px;">Personal Insights — ${name}</h2>
-<table>${'<colgroup><col style="width:140px;">' + cols.map(() => '<col>').join('') + '</colgroup>'}
-<thead><tr><th style="padding:8px 6px;border:1px solid #e5e7eb;background:#f3f4f6;"></th>${headerCells}</tr></thead>
-<tbody>${bodyRows}</tbody></table>
-<p style="margin-top:16px;font-size:10px;color:#888;">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</p>
+<h2>Personal Insights — ${name}</h2>
+<table>
+<colgroup><col style="width:120px;">${cols.map(() => '<col>').join('')}</colgroup>
+<thead><tr>
+<th style="padding:6px 5px;border:1px solid #d1d5db;background:#f3f4f6;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></th>
+${headerCells}
+</tr></thead>
+<tbody>${bodyRows}</tbody>
+<tfoot><tr><td colspan="${colCount}">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</td></tr></tfoot>
+</table>
 </body></html>`
 }
 
 export default function PersonalInsightsModal({ participant, onClose }) {
   const strengths = (participant.top5 || []).filter(Boolean)
   const validStrengths = strengths.filter(s => PERSONAL_INSIGHTS[s])
-  const printRef = useRef(null)
 
   function handlePrint() {
-    const html = buildPrintHTML(participant.name, strengths)
+    const html = buildPersonalInsightsPrintHTML(participant.name, strengths)
     const win = window.open('', '_blank')
     win.document.write(html)
     win.document.close()
     win.focus()
-    win.print()
+    setTimeout(() => win.print(), 250)
   }
 
   if (strengths.length === 0) {
@@ -81,10 +97,7 @@ export default function PersonalInsightsModal({ participant, onClose }) {
               </svg>
               Print / PDF
             </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
-            >
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -93,7 +106,7 @@ export default function PersonalInsightsModal({ participant, onClose }) {
         </div>
 
         {/* Table */}
-        <div className="overflow-auto p-4" ref={printRef}>
+        <div className="overflow-auto p-4">
           <table className="w-full border-collapse text-sm" style={{ minWidth: `${140 + validStrengths.length * 180}px` }}>
             <colgroup>
               <col style={{ width: '150px' }} />

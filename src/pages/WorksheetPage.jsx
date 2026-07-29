@@ -5,6 +5,9 @@ import StrengthBadge from '../components/StrengthBadge'
 import { getStrengthColors } from '../lib/strengthColors'
 import { getWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import SiteFooter from '../components/SiteFooter'
+import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
+
+const PI_SENTINEL = '__personal_insights__'
 
 export default function WorksheetPage() {
   const { slug } = useParams()
@@ -165,6 +168,7 @@ export default function WorksheetPage() {
   )
   if (!participant || !session) return null
 
+  const isPersonalInsights = (session.prompts ?? [])[0] === PI_SENTINEL
   const prompts = session.prompts ?? []
   const strengths = participant.top5 ?? []
 
@@ -215,6 +219,70 @@ export default function WorksheetPage() {
               </button>
             )}
           </div>
+        </div>
+      ) : isPersonalInsights ? (
+        /* ── Personal Insights pre-filled report ── */
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+          <div className="mb-4">
+            <h1 className="text-xl font-bold text-gray-900">Personal Insights</h1>
+            <p className="text-sm text-gray-500 mt-1">{session.title}</p>
+          </div>
+          <div className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-6">
+            <table className="w-full border-collapse text-sm" style={{ minWidth: `${150 + strengths.length * 180}px` }}>
+              <colgroup>
+                <col style={{ width: '150px' }} />
+                {strengths.map(s => <col key={s} />)}
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="border border-gray-200 bg-gray-50 p-3" />
+                  {strengths.map(s => {
+                    const c = getStrengthColors(s)
+                    return (
+                      <th key={s} className="border border-gray-200 p-3 text-center font-bold text-sm"
+                        style={{ background: c.headerBg, color: c.headerText }}>
+                        {s}
+                      </th>
+                    )
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {ROWS.map(row => (
+                  <tr key={row.key} className="even:bg-gray-50/40">
+                    <th className="border border-gray-200 bg-gray-50 p-3 text-left text-xs font-semibold text-gray-700 align-top whitespace-nowrap">
+                      {row.key === 'description' ? participant.name : row.label}
+                    </th>
+                    {strengths.map(s => (
+                      <td key={s} className="border border-gray-200 p-3 text-xs text-gray-700 align-top leading-relaxed">
+                        {PERSONAL_INSIGHTS[s]?.[row.key] ?? ''}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-400 mb-6">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</p>
+          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+          <button
+            onClick={async () => {
+              setSubmitting(true)
+              await supabase.from('responses').upsert([{
+                participant_id: participant.id,
+                prompt_index: 0,
+                strength_index: 0,
+                response_text: '__reviewed__',
+                submitted_at: new Date().toISOString(),
+              }], { onConflict: 'participant_id,prompt_index,strength_index' })
+              setSubmitted(true)
+              setSubmitting(false)
+            }}
+            disabled={submitting}
+            className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors"
+          >
+            {submitting ? 'Saving…' : 'Mark as Reviewed'}
+          </button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
