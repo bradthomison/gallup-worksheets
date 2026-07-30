@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
+import { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
 import SiteFooter from '../components/SiteFooter'
 
 export default function PersonalInsightsLMSPage() {
@@ -130,7 +131,14 @@ export default function PersonalInsightsLMSPage() {
                 <p className="text-gray-500 text-sm mt-0.5">{person.name}</p>
               </div>
               <button
-                onClick={() => window.print()}
+                onClick={() => {
+                const html = buildPersonalInsightsPrintHTML(person.name, strengths)
+                const win = window.open('', '_blank')
+                win.document.write(html)
+                win.document.close()
+                win.focus()
+                setTimeout(() => win.print(), 250)
+              }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium print:hidden"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

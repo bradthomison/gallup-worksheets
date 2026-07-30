@@ -14,7 +14,7 @@ export function buildPersonalInsightsPrintHTML(name, strengths) {
   const bodyRows = ROWS.map(row => {
     const labelCell = row.key === 'description'
       ? `<th style="padding:6px 5px;font-size:11px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #d1d5db;min-width:120px;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${name}</th>`
-      : `<th style="padding:6px 5px;font-size:11px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #d1d5db;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;white-space:nowrap;">${row.label}</th>`
+      : `<th style="padding:6px 5px;font-size:11px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #d1d5db;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>`
 
     const cells = cols.map(s => {
       const text = PERSONAL_INSIGHTS[s]?.[row.key] ?? ''
@@ -27,22 +27,20 @@ export function buildPersonalInsightsPrintHTML(name, strengths) {
   return `<!DOCTYPE html><html><head><title>Personal Insights — ${name}</title>
 <style>
 *{box-sizing:border-box;}
-body{font-family:Arial,sans-serif;margin:0;padding:8px;}
-h2{font-size:14px;margin:0 0 6px 0;color:#111;}
-table{border-collapse:collapse;width:100%;table-layout:fixed;}
-th,td{word-wrap:break-word;}
-tfoot td{border-top:1px solid #d1d5db;padding:3px 5px;font-size:8.5px;color:#9ca3af;}
-@media print{
-  @page{size:landscape;margin:0.35in;}
-  body{padding:0;}
-  -webkit-print-color-adjust:exact;
-  print-color-adjust:exact;
-}
+html,body{height:100%;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}
+h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
+th,td{word-wrap:break-word;overflow-wrap:break-word;}
+tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}
+@page{size:landscape;margin:0.35in;}
+-webkit-print-color-adjust:exact;
+print-color-adjust:exact;
 </style>
 </head><body>
 <h2>Personal Insights — ${name}</h2>
 <table>
-<colgroup><col style="width:120px;">${cols.map(() => '<col>').join('')}</colgroup>
+<colgroup><col style="width:145px;">${cols.map(() => '<col>').join('')}</colgroup>
 <thead><tr>
 <th style="padding:6px 5px;border:1px solid #d1d5db;background:#f3f4f6;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></th>
 ${headerCells}
