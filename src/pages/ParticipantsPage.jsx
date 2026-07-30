@@ -911,7 +911,7 @@ export default function ParticipantsPage() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex items-center gap-2">
         <input
           type="search"
           value={search}
@@ -919,6 +919,14 @@ export default function ParticipantsPage() {
           placeholder="Search by name, email, strength, or team…"
           className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
         />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-full transition-colors whitespace-nowrap"
+          >
+            Clear search
+          </button>
+        )}
       </div>
 
       {/* Paste multiple panel */}
