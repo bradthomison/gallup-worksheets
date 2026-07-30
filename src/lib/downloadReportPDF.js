@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
+import { BRING_NEED } from '../data/bringNeed'
 import { getStrengthColors } from './strengthColors'
 
 function hexToRgb(hex) {
@@ -145,4 +146,81 @@ export async function downloadCustomReportPDF(reportName, person, rows, insights
   )
 
   doc.save(safeName(`${person.name} - ${reportName}.pdf`))
+}
+
+// Bring - Need lays strengths down the side (one row per theme) with two
+// columns — "I Bring" and "I Need" — instead of strengths across the top.
+export async function downloadBringNeedPDF(person) {
+  const strengths = (person.top5 ?? []).filter(s => BRING_NEED[s])
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+
+  let headerBottom = 20
+  const logo = await loadLogoDataUrl()
+  if (logo) {
+    const logoH = 40
+    const logoW = (logo.width / logo.height) * logoH
+    doc.addImage(logo.dataUrl, 'PNG', 20, 12, logoW, logoH)
+    headerBottom = 12 + logoH + 6
+  }
+
+  doc.setDrawColor(220, 220, 220)
+  doc.line(20, headerBottom, pageWidth - 20, headerBottom)
+
+  const infoY = headerBottom + 15
+  doc.setFontSize(13)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text('Bring - Need', 20, infoY)
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(80, 80, 80)
+  doc.text(person.name, 20, infoY + 14)
+
+  const startY = infoY + 26
+  const usableWidth = pageWidth - 40
+  const themeColWidth = 90
+  const textColWidth = (usableWidth - themeColWidth) / 2
+
+  const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
+
+  autoTable(doc, {
+    head: [['Theme', 'I Bring', 'I Need']],
+    body: strengths.map(s => [s, BRING_NEED[s]?.bring ?? '', BRING_NEED[s]?.need ?? '']),
+    startY,
+    tableWidth: usableWidth,
+    margin: { left: 20, right: 20 },
+    styles: { fontSize: 8.5, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 6 },
+    columnStyles: {
+      0: { cellWidth: themeColWidth, fontStyle: 'bold', fontSize: 9 },
+      1: { cellWidth: textColWidth },
+      2: { cellWidth: textColWidth },
+    },
+    bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
+    didParseCell(data) {
+      if (data.section === 'body' && data.column.index === 0) {
+        data.cell.styles.fillColor = headerColors[data.row.index] ?? [59, 91, 219]
+        data.cell.styles.textColor = [255, 255, 255]
+      }
+    },
+  })
+
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6)
+    doc.setTextColor(170, 170, 170)
+    doc.setDrawColor(210, 210, 210)
+    doc.line(20, pageHeight - 22, pageWidth - 20, pageHeight - 22)
+    doc.text(
+      'Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.',
+      pageWidth / 2, pageHeight - 12, { align: 'center' }
+    )
+  }
+
+  doc.save(safeName(`${person.name} - Bring - Need.pdf`))
 }

@@ -1,0 +1,194 @@
+import { useState } from 'react'
+import { BRING_NEED } from '../data/bringNeed'
+import { getStrengthColors } from '../lib/strengthColors'
+import { supabase } from '../lib/supabase'
+import { downloadBringNeedPDF } from '../lib/downloadReportPDF'
+
+// Builds a standalone print-ready HTML page for one participant.
+// Unlike Personal Insights, strengths run down the side (one row per theme)
+// with "I Bring" / "I Need" as the two columns.
+export function buildBringNeedPrintHTML(name, strengths) {
+  const rows = strengths.filter(s => BRING_NEED[s])
+
+  const bodyRows = rows.map(s => {
+    const c = getStrengthColors(s)
+    const labelCell = `<th style="width:110px;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:6px 5px;font-size:11px;font-weight:700;text-align:left;vertical-align:top;">${s}</th>`
+    const bringCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:10px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.bring ?? '').replace(/\n/g, '<br/>')}</td>`
+    const needCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:10px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.need ?? '').replace(/\n/g, '<br/>')}</td>`
+    return `<tr>${labelCell}${bringCell}${needCell}</tr>`
+  }).join('')
+
+  return `<!DOCTYPE html><html><head><title>Bring - Need — ${name}</title>
+<style>
+*{box-sizing:border-box;}
+html,body{height:100%;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}
+h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
+th,td{word-wrap:break-word;overflow-wrap:break-word;}
+tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}
+@page{size:portrait;margin:0.4in;}
+-webkit-print-color-adjust:exact;
+print-color-adjust:exact;
+</style>
+</head><body>
+<h2>Bring - Need — ${name}</h2>
+<table>
+<colgroup><col style="width:110px;"/><col/><col/></colgroup>
+<thead><tr>
+<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></th>
+<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Bring<br/><span style="font-weight:400;font-size:9px;">This is what I can contribute (The value I add)</span></th>
+<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Need<br/><span style="font-weight:400;font-size:9px;">This is what I need (My Energizers)</span></th>
+</tr></thead>
+<tbody>${bodyRows}</tbody>
+<tfoot><tr><td colspan="3">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</td></tr></tfoot>
+</table>
+</body></html>`
+}
+
+export default function BringNeedModal({ participant, onClose }) {
+  const strengths = (participant.top5 || []).filter(Boolean)
+  const validStrengths = strengths.filter(s => BRING_NEED[s])
+  const [copied, setCopied] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [sendLoading, setSendLoading] = useState(false)
+
+  const lmsUrl = `${window.location.origin}/bring-need?email=${encodeURIComponent(participant.email ?? '')}`
+
+  function openPrintWindow() {
+    const html = buildBringNeedPrintHTML(participant.name, strengths)
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 250)
+  }
+
+  async function handlePdf() {
+    setPdfLoading(true)
+    await downloadBringNeedPDF(participant)
+    setPdfLoading(false)
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(lmsUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  async function sendLink() {
+    setSendLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.functions.invoke('send-report-link', {
+      body: {
+        to_email: participant.email,
+        to_name: participant.name,
+        report_name: 'Bring - Need',
+        report_url: lmsUrl,
+        coach_id: user?.id,
+      },
+    })
+    setSendLoading(false)
+  }
+
+  if (strengths.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+        <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Bring - Need — {participant.name}</h2>
+          <p className="text-sm text-gray-500">No strengths recorded for this participant. Add their top 5 strengths first.</p>
+          <button onClick={onClose} className="mt-4 px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium">Close</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl my-4">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Bring - Need</h2>
+            <p className="text-sm text-gray-500">{participant.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={sendLink} disabled={sendLoading} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm font-medium transition-colors">
+              {sendLoading ? '…' : 'Send Link'}
+            </button>
+            <button onClick={copyLink} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+              {copied ? '✓ Copied' : 'Copy Link'}
+            </button>
+            <button onClick={handlePdf} disabled={pdfLoading} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm font-medium transition-colors">
+              {pdfLoading ? '…' : '↓ PDF'}
+            </button>
+            <button
+              onClick={openPrintWindow}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Table — strengths down the side, Bring/Need as columns */}
+        <div className="overflow-auto p-4">
+          <table className="w-full border-collapse text-sm">
+            <colgroup>
+              <col style={{ width: '130px' }} />
+              <col />
+              <col />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className="border border-gray-200 bg-gray-50 p-2" />
+                <th className="border border-gray-200 bg-gray-50 p-2 text-left text-xs font-semibold text-gray-700">
+                  I Bring
+                  <div className="font-normal text-gray-400 normal-case">This is what I can contribute (The value I add)</div>
+                </th>
+                <th className="border border-gray-200 bg-gray-50 p-2 text-left text-xs font-semibold text-gray-700">
+                  I Need
+                  <div className="font-normal text-gray-400 normal-case">This is what I need (My Energizers)</div>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {validStrengths.map(s => {
+                const c = getStrengthColors(s)
+                return (
+                  <tr key={s}>
+                    <th
+                      className="border border-gray-200 p-2 text-left text-xs font-bold align-top"
+                      style={{ background: c.headerBg, color: c.headerText }}
+                    >
+                      {s}
+                    </th>
+                    <td className="border border-gray-200 p-2 text-xs text-gray-700 align-top leading-relaxed" style={{ whiteSpace: 'pre-line' }}>
+                      {BRING_NEED[s]?.bring ?? ''}
+                    </td>
+                    <td className="border border-gray-200 p-2 text-xs text-gray-700 align-top leading-relaxed" style={{ whiteSpace: 'pre-line' }}>
+                      {BRING_NEED[s]?.need ?? ''}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400">
+          Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
+        </div>
+      </div>
+    </div>
+  )
+}

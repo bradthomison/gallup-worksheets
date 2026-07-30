@@ -13,6 +13,7 @@ import LMSLandingPage from './pages/LMSLandingPage'
 import LMSWorksheetPage from './pages/LMSWorksheetPage'
 import LMSLearnersPage from './pages/LMSLearnersPage'
 import PersonalInsightsLMSPage from './pages/PersonalInsightsLMSPage'
+import BringNeedLMSPage from './pages/BringNeedLMSPage'
 import ReportLMSPage from './pages/ReportLMSPage'
 import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/lms/:themeId" element={<LMSLandingPage />} />
       <Route path="/lms-worksheet/:slug" element={<LMSWorksheetPage />} />
       <Route path="/personal-insights" element={<PersonalInsightsLMSPage />} />
+      <Route path="/bring-need" element={<BringNeedLMSPage />} />
       <Route path="/report/:reportId" element={<ReportLMSPage />} />
       <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />

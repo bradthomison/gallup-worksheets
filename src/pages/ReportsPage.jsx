@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
+import { BRING_NEED } from '../data/bringNeed'
 
 const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS).sort()
 
@@ -19,7 +20,12 @@ const FIELD_LABELS = {
   myDemotivators:   'My Demotivators (I Dislike)',
 }
 
-function StrengthContentEditor({ reportType, staticFallback }) {
+const BRING_NEED_FIELD_LABELS = {
+  bring: 'I Bring (The value I add)',
+  need:  'I Need (My Energizers)',
+}
+
+function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD_LABELS }) {
   const [selectedStrength, setSelectedStrength] = useState('Activator')
   const [dbContent, setDbContent] = useState({})
   const [editFields, setEditFields] = useState({})
@@ -100,13 +106,13 @@ function StrengthContentEditor({ reportType, staticFallback }) {
             </select>
           </div>
           <div className="space-y-3">
-            {Object.entries(FIELD_LABELS).map(([key, label]) => (
+            {Object.entries(fieldLabels).map(([key, label]) => (
               <div key={key}>
                 <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
                 <textarea
                   value={editFields[key] ?? ''}
                   onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
-                  rows={key === 'description' ? 3 : 2}
+                  rows={key === 'description' ? 3 : (key === 'bring' || key === 'need' ? 5 : 2)}
                   disabled={!tableExists}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y disabled:bg-gray-50 disabled:text-gray-400"
                 />
@@ -296,6 +302,66 @@ function PersonalInsightsReport() {
             </button>
           </div>
           <StrengthContentEditor reportType="personal_insights" staticFallback={PERSONAL_INSIGHTS} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BringNeedReport() {
+  const [expanded, setExpanded] = useState(false)
+  const [lmsCopied, setLmsCopied] = useState(false)
+
+  const lmsUrl = `${window.location.origin}/bring-need`
+
+  function copyLmsLink() {
+    navigator.clipboard.writeText(lmsUrl).then(() => {
+      setLmsCopied(true)
+      setTimeout(() => setLmsCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-3 text-left flex-1 min-w-0"
+        >
+          <svg
+            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <div>
+            <p className="font-semibold text-gray-900">Bring - Need</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                34 strengths · strengths down the side
+              </span>
+              <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                Built-in
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
+              <p className="text-xs text-brand-500 truncate">{lmsUrl}</p>
+            </div>
+            <button
+              onClick={copyLmsLink}
+              className="shrink-0 ml-4 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            >
+              {lmsCopied ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+          <StrengthContentEditor reportType="bring_need" staticFallback={BRING_NEED} fieldLabels={BRING_NEED_FIELD_LABELS} />
         </div>
       )}
     </div>
@@ -603,6 +669,7 @@ export default function ReportsPage() {
       ) : (
         <div className="space-y-3">
           <PersonalInsightsReport />
+          <BringNeedReport />
           {reports.map(r => (
             <CustomReportCard key={r.id} report={r} onDelete={handleDelete} />
           ))}

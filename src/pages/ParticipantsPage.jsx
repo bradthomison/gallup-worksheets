@@ -6,11 +6,13 @@ import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN, getStrengthColors } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
-import { downloadPersonalInsightsPDF, downloadCustomReportPDF } from '../lib/downloadReportPDF'
+import { downloadPersonalInsightsPDF, downloadCustomReportPDF, downloadBringNeedPDF } from '../lib/downloadReportPDF'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import PersonalInsightsModal, { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
 import PersonalInsightsBulkModal from '../components/PersonalInsightsBulkModal'
+import BringNeedModal from '../components/BringNeedModal'
+import BringNeedBulkModal from '../components/BringNeedBulkModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -350,13 +352,14 @@ function CustomReportModal({ report, participant, onClose }) {
 }
 
 // ── PersonReportsPanel ────────────────────────────────────────────────────────
-function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, onOpenCustomReport }) {
+function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, onOpenBringNeed, onOpenCustomReport }) {
   const strengths = (person.top5 ?? []).filter(Boolean)
   const [pdfLoading, setPdfLoading] = useState({})
   const [copied, setCopied] = useState({})
   const [sendLoading, setSendLoading] = useState({})
 
   const piUrl = `${window.location.origin}/personal-insights?email=${encodeURIComponent(person.email ?? '')}`
+  const bnUrl = `${window.location.origin}/bring-need?email=${encodeURIComponent(person.email ?? '')}`
 
   function openPrintWindow(html) {
     const win = window.open('', '_blank')
@@ -370,6 +373,12 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
     setPdfLoading(p => ({ ...p, pi: true }))
     await downloadPersonalInsightsPDF(person)
     setPdfLoading(p => ({ ...p, pi: false }))
+  }
+
+  async function handleBNPdf() {
+    setPdfLoading(p => ({ ...p, bn: true }))
+    await downloadBringNeedPDF(person)
+    setPdfLoading(p => ({ ...p, bn: false }))
   }
 
   async function handleCustomPdf(report) {
@@ -440,6 +449,26 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
               </button>
               <button onClick={() => sendLink(piUrl, 'Personal Insights', 'pi')} disabled={sendLoading['pi']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
                 {sendLoading['pi'] ? '…' : 'Send Link'}
+              </button>
+            </div>
+          </div>
+
+          {/* Bring - Need */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Built-in</span>
+              <span className="text-sm text-gray-700 truncate">Bring - Need</span>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+              <button onClick={onOpenBringNeed} className={actionBtnBrand}>Open</button>
+              <button onClick={handleBNPdf} disabled={pdfLoading['bn']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {pdfLoading['bn'] ? '…' : '↓ PDF'}
+              </button>
+              <button onClick={() => copyLink('bn', bnUrl)} className={`pl-2.5 ${actionBtn}`}>
+                {copied['bn'] ? '✓ Copied' : 'Copy Link'}
+              </button>
+              <button onClick={() => sendLink(bnUrl, 'Bring - Need', 'bn')} disabled={sendLoading['bn']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {sendLoading['bn'] ? '…' : 'Send Link'}
               </button>
             </div>
           </div>
@@ -837,6 +866,8 @@ export default function ParticipantsPage() {
   const [expandedPersonId, setExpandedPersonId] = useState(null)
   const [insightsModal, setInsightsModal] = useState(null)
   const [bulkInsightsModal, setBulkInsightsModal] = useState(false)
+  const [bringNeedModal, setBringNeedModal] = useState(null)
+  const [bulkBringNeedModal, setBulkBringNeedModal] = useState(false)
   const [reportsPersonId, setReportsPersonId] = useState(null)
   const [customReportModal, setCustomReportModal] = useState(null)
   const [reports, setReports] = useState([])
@@ -953,6 +984,19 @@ export default function ParticipantsPage() {
           onClose={() => setBulkInsightsModal(false)}
         />
       )}
+      {bringNeedModal && (
+        <BringNeedModal
+          participant={bringNeedModal}
+          onClose={() => setBringNeedModal(null)}
+        />
+      )}
+      {bulkBringNeedModal && (
+        <BringNeedBulkModal
+          people={people}
+          teams={teams}
+          onClose={() => setBulkBringNeedModal(false)}
+        />
+      )}
       {addTeamModal && (
         <AddTeamModal
           onSave={handleTeamCreated}
@@ -983,6 +1027,12 @@ export default function ParticipantsPage() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               Personal Insights Reports
+            </button>
+            <button
+              onClick={() => setBulkBringNeedModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Bring - Need Reports
             </button>
           </div>
         </div>
@@ -1192,6 +1242,7 @@ export default function ParticipantsPage() {
                             reports={reports}
                             onClose={() => setReportsPersonId(null)}
                             onOpenPersonalInsights={() => { setInsightsModal(p); setReportsPersonId(null) }}
+                            onOpenBringNeed={() => { setBringNeedModal(p); setReportsPersonId(null) }}
                             onOpenCustomReport={report => setCustomReportModal({ report, person: p })}
                           />
                         </td>
