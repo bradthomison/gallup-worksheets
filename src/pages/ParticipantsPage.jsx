@@ -890,18 +890,6 @@ export default function ParticipantsPage() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => navigate('/teams')}
-              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              Edit Teams
-            </button>
-            <button
-              onClick={() => openAddTeamModal(null)}
-              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              + Add Team
-            </button>
-            <button
               onClick={() => setBulkInsightsModal(true)}
               className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
