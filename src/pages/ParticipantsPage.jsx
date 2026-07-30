@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
-import { STRENGTH_DOMAIN } from '../lib/strengthColors'
+import { STRENGTH_DOMAIN, getStrengthColors } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import { formatDateShort } from '../lib/dateUtils'
@@ -219,6 +219,178 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, onDeletePerso
         </div>
       </td>
     </tr>
+  )
+}
+
+// ── CustomReportModal ─────────────────────────────────────────────────────────
+function buildCustomReportPrintHTML(reportName, personName, strengths, rows, insights) {
+  const colWidth = Math.floor((100 - 16) / strengths.length)
+  const headerCells = strengths.map(s => {
+    const c = getStrengthColors(s)
+    return `<th style="width:${colWidth}%;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};padding:4px 5px;font-size:9px;font-weight:700;text-align:center;">${s}</th>`
+  }).join('')
+  const bodyRows = rows.map(row => {
+    const cells = strengths.map(s => `<td style="border:1px solid #d1d5db;padding:3px 5px;font-size:8px;color:#374151;vertical-align:top;word-wrap:break-word;">${insights?.[s]?.[row.id] ?? ''}</td>`).join('')
+    return `<tr><th style="width:145px;border:1px solid #d1d5db;background:#f9fafb;padding:3px 5px;font-size:8px;font-weight:600;color:#374151;text-align:left;vertical-align:top;word-wrap:break-word;">${row.label}</th>${cells}</tr>`
+  }).join('')
+  return `<!DOCTYPE html><html><head><title>${reportName} — ${personName}</title><style>*{box-sizing:border-box;}html,body{height:100%;margin:0;padding:0;}body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}@page{size:landscape;margin:0.35in;}-webkit-print-color-adjust:exact;print-color-adjust:exact;</style></head><body><h2>${reportName} — ${personName}</h2><table><colgroup><col style="width:145px;"/>${strengths.map(() => `<col style="width:${colWidth}%;"/>`).join('')}</colgroup><thead><tr><th style="border:1px solid #d1d5db;background:#f9fafb;"></th>${headerCells}</tr></thead><tbody>${bodyRows}</tbody><tfoot><tr><td colspan="${strengths.length + 1}">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</td></tr></tfoot></table></body></html>`
+}
+
+function CustomReportModal({ report, participant, onClose }) {
+  const [insights, setInsights] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const strengths = (participant.top5 ?? []).filter(Boolean)
+  const rows = report.rows ?? []
+
+  useEffect(() => {
+    async function load() {
+      const map = {}
+      strengths.forEach(s => { map[s] = {} })
+      if (strengths.length > 0) {
+        const { data } = await supabase
+          .from('report_content')
+          .select('strength_name, content')
+          .eq('report_type', report.id)
+          .in('strength_name', strengths)
+        ;(data ?? []).forEach(r => { if (r.content) map[r.strength_name] = r.content })
+      }
+      setInsights(map)
+      setLoading(false)
+    }
+    load()
+  }, [report.id])
+
+  function handlePrint() {
+    const html = buildCustomReportPrintHTML(report.name, participant.name, strengths, rows, insights)
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 250)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4 py-6">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl flex flex-col max-h-[90vh]">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">{report.name}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">{participant.name}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handlePrint}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+            >
+              Print / PDF
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-6">
+          {loading ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : rows.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">This report has no rows defined yet.</p>
+              <p className="text-sm text-gray-400 mt-1">Go to Themes and Reports to add rows.</p>
+            </div>
+          ) : strengths.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No strengths entered for this participant.</p>
+            </div>
+          ) : (
+            <div className="overflow-auto">
+              <table className="w-full border-collapse text-sm" style={{ minWidth: `${150 + strengths.length * 180}px` }}>
+                <colgroup>
+                  <col style={{ width: '150px' }} />
+                  {strengths.map(s => <col key={s} />)}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th className="border border-gray-200 bg-gray-50 p-3" />
+                    {strengths.map(s => {
+                      const c = getStrengthColors(s)
+                      return (
+                        <th key={s} className="border border-gray-200 p-3 text-center font-bold text-sm"
+                          style={{ background: c.headerBg, color: c.headerText }}>
+                          {s}
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => (
+                    <tr key={row.id} className="even:bg-gray-50/50">
+                      <th className="border border-gray-200 bg-gray-50 p-3 text-left text-xs font-semibold text-gray-700 align-top">
+                        {row.label}
+                      </th>
+                      {strengths.map(s => (
+                        <td key={s} className="border border-gray-200 p-3 text-xs text-gray-700 align-top leading-relaxed">
+                          {insights?.[s]?.[row.id] ?? ''}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── PersonReportsPanel ────────────────────────────────────────────────────────
+function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, onOpenCustomReport }) {
+  const strengths = (person.top5 ?? []).filter(Boolean)
+  return (
+    <div className="bg-purple-50 border-t border-purple-100 px-6 py-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="font-semibold text-gray-900">{person.name}'s Reports</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+      </div>
+      {strengths.length === 0 ? (
+        <p className="text-sm text-gray-400">No strengths entered — reports require CliftonStrengths data.</p>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Built-in</span>
+              <span className="text-sm text-gray-700">Personal Insights</span>
+            </div>
+            <button
+              onClick={onOpenPersonalInsights}
+              className="text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors"
+            >Open</button>
+          </div>
+          {reports.length === 0 && (
+            <p className="text-xs text-gray-400 pt-1">No custom reports yet. Create one on the Themes and Reports page.</p>
+          )}
+          {reports.map(report => (
+            <div key={report.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm text-gray-700">{report.name}</span>
+                {(report.rows ?? []).length === 0 && (
+                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">No rows</span>
+                )}
+              </div>
+              <button
+                onClick={() => onOpenCustomReport(report)}
+                className="text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors"
+              >Open</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -575,6 +747,9 @@ export default function ParticipantsPage() {
   const [expandedPersonId, setExpandedPersonId] = useState(null)
   const [insightsModal, setInsightsModal] = useState(null)
   const [bulkInsightsModal, setBulkInsightsModal] = useState(false)
+  const [reportsPersonId, setReportsPersonId] = useState(null)
+  const [customReportModal, setCustomReportModal] = useState(null)
+  const [reports, setReports] = useState([])
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -583,12 +758,14 @@ export default function ParticipantsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data }, { data: teamsData }] = await Promise.all([
+    const [{ data }, { data: teamsData }, { data: reportsData }] = await Promise.all([
       supabase.from('people').select('*').order('name'),
       supabase.from('teams').select('*').order('name'),
+      supabase.from('reports').select('*').order('name'),
     ])
     setPeople(data ?? [])
     setTeams(teamsData ?? [])
+    setReports(reportsData ?? [])
     setLoading(false)
   }
 
@@ -670,6 +847,13 @@ export default function ParticipantsPage() {
         <PersonalInsightsModal
           participant={insightsModal}
           onClose={() => setInsightsModal(null)}
+        />
+      )}
+      {customReportModal && (
+        <CustomReportModal
+          report={customReportModal.report}
+          participant={customReportModal.person}
+          onClose={() => setCustomReportModal(null)}
         />
       )}
       {bulkInsightsModal && (
@@ -886,14 +1070,20 @@ export default function ParticipantsPage() {
                           <div className="flex items-center gap-1.5">
                             {(p.top5 ?? []).some(Boolean) && (
                               <button
-                                onClick={() => { setInsightsModal(p); setExpandedPersonId(null) }}
+                                onClick={() => { setInsightsModal(p); setExpandedPersonId(null); setReportsPersonId(null) }}
                                 className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
                               >
                                 Personal Insights
                               </button>
                             )}
                             <button
-                              onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
+                              onClick={() => { setReportsPersonId(id => id === p.id ? null : p.id); setExpandedPersonId(null); setEditingId(null) }}
+                              className="text-xs font-medium text-purple-600 hover:text-purple-800 border border-purple-200 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Reports {reportsPersonId === p.id ? '↑' : '›'}
+                            </button>
+                            <button
+                              onClick={() => { setExpandedPersonId(id => id === p.id ? null : p.id); setReportsPersonId(null); setEditingId(null) }}
                               className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
                             >
                               Worksheets {expandedPersonId === p.id ? '↑' : '›'}
@@ -908,6 +1098,19 @@ export default function ParticipantsPage() {
                           <PersonWorksheetPanel
                             person={p}
                             onClose={() => setExpandedPersonId(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    {reportsPersonId === p.id && deleteConfirm !== p.id && (
+                      <tr key={`${p.id}-reports-panel`}>
+                        <td colSpan={5} className="p-0">
+                          <PersonReportsPanel
+                            person={p}
+                            reports={reports}
+                            onClose={() => setReportsPersonId(null)}
+                            onOpenPersonalInsights={() => { setInsightsModal(p); setReportsPersonId(null) }}
+                            onOpenCustomReport={report => setCustomReportModal({ report, person: p })}
                           />
                         </td>
                       </tr>

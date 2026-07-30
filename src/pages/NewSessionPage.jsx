@@ -11,8 +11,9 @@ export default function NewSessionPage() {
   const [date, setDate] = useState('')
   const [promptsText, setPromptsText] = useState('')
 
-  // Theme picker
+  // Theme / report picker
   const [themes, setThemes] = useState([])
+  const [reports, setReports] = useState([])
   const [selectedTheme, setSelectedTheme] = useState('')
 
   // Participant picker
@@ -34,21 +35,21 @@ export default function NewSessionPage() {
     supabase.from('people').select('*').order('name').then(({ data }) => setPeople(data ?? []))
     supabase.from('prompt_themes').select('*').order('name').then(({ data }) => setThemes(data ?? []))
     supabase.from('teams').select('*').order('name').then(({ data }) => setTeams(data ?? []))
+    supabase.from('reports').select('*').order('name').then(({ data }) => setReports(data ?? []))
   }, [])
 
   const teamMap = {}
   teams.forEach(t => { teamMap[t.id] = t })
 
   const PI_SENTINEL = '__personal_insights__'
+  const REPORT_PREFIX = 'report:'
 
   function handleThemeChange(e) {
     const id = e.target.value
     setSelectedTheme(id)
-    if (!id) { return }
-    if (id === PI_SENTINEL) {
-      setPromptsText(PI_SENTINEL)
-      return
-    }
+    if (!id) { setPromptsText(''); return }
+    if (id === PI_SENTINEL) { setPromptsText(PI_SENTINEL); return }
+    if (id.startsWith(REPORT_PREFIX)) { setPromptsText(id); return }
     const theme = themes.find(t => t.id === id)
     if (theme) setPromptsText((theme.prompts ?? []).join('\n'))
   }
@@ -107,11 +108,14 @@ export default function NewSessionPage() {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    const reportId = selectedTheme.startsWith(REPORT_PREFIX) ? selectedTheme.slice(REPORT_PREFIX.length) : null
     const themeName = selectedTheme === PI_SENTINEL
       ? 'Personal Insights'
-      : selectedTheme
-        ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
-        : null
+      : reportId
+        ? (reports.find(r => r.id === reportId)?.name ?? null)
+        : selectedTheme
+          ? (themes.find(t => t.id === selectedTheme)?.name ?? null)
+          : null
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
@@ -242,27 +246,39 @@ export default function NewSessionPage() {
                 <h2 className="font-semibold text-gray-900">Prompts</h2>
                 <p className="text-sm text-gray-500 mt-0.5">One prompt per line — these become the row headers in the worksheet grid.</p>
               </div>
-              {themes.length > 0 && (
-                <div className="shrink-0">
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Load from theme</label>
-                  <select
-                    value={selectedTheme}
-                    onChange={handleThemeChange}
-                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
-                  >
-                    <option value="">Choose a theme…</option>
-                    <option value={PI_SENTINEL}>⭐ Personal Insights (Pre-filled Report)</option>
-                    {themes.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} ({t.prompts?.length ?? 0})</option>
+              <div className="shrink-0">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Load from theme or report</label>
+                <select
+                  value={selectedTheme}
+                  onChange={handleThemeChange}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                >
+                  <option value="">Choose…</option>
+                  <optgroup label="Reports">
+                    <option value={PI_SENTINEL}>Personal Insights</option>
+                    {reports.map(r => (
+                      <option key={r.id} value={`${REPORT_PREFIX}${r.id}`}>{r.name}</option>
                     ))}
-                  </select>
-                </div>
-              )}
+                  </optgroup>
+                  {themes.length > 0 && (
+                    <optgroup label="Themes">
+                      {themes.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.prompts?.length ?? 0})</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
             </div>
             {promptsText === PI_SENTINEL ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 <p className="font-medium">Personal Insights selected</p>
                 <p className="text-xs mt-0.5 text-emerald-700">Each participant will receive a pre-filled report based on their top 5 strengths. No prompts needed.</p>
+              </div>
+            ) : promptsText.startsWith(REPORT_PREFIX) ? (
+              <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                <p className="font-medium">{reports.find(r => r.id === promptsText.slice(REPORT_PREFIX.length))?.name ?? 'Custom Report'} selected</p>
+                <p className="text-xs mt-0.5 text-brand-700">Each participant will receive a pre-filled report based on their top 5 strengths. No prompts needed.</p>
               </div>
             ) : (
               <>
