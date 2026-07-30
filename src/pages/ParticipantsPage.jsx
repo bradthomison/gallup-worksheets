@@ -1058,37 +1058,33 @@ export default function ParticipantsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-1.5">
-                          <div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {(p.top5 ?? []).some(Boolean) ? (
                             <button
-                              onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
-                              className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
+                              onClick={() => { setInsightsModal(p); setExpandedPersonId(null); setReportsPersonId(null) }}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
                             >
-                              Edit Person
+                              Personal Insights
                             </button>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {(p.top5 ?? []).some(Boolean) && (
-                              <button
-                                onClick={() => { setInsightsModal(p); setExpandedPersonId(null); setReportsPersonId(null) }}
-                                className="text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
-                              >
-                                Personal Insights
-                              </button>
-                            )}
-                            <button
-                              onClick={() => { setReportsPersonId(id => id === p.id ? null : p.id); setExpandedPersonId(null); setEditingId(null) }}
-                              className="text-xs font-medium text-purple-600 hover:text-purple-800 border border-purple-200 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-lg transition-colors"
-                            >
-                              Reports {reportsPersonId === p.id ? '↑' : '›'}
-                            </button>
-                            <button
-                              onClick={() => { setExpandedPersonId(id => id === p.id ? null : p.id); setReportsPersonId(null); setEditingId(null) }}
-                              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
-                            >
-                              Worksheets {expandedPersonId === p.id ? '↑' : '›'}
-                            </button>
-                          </div>
+                          ) : <div />}
+                          <button
+                            onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null); setReportsPersonId(null) }}
+                            className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Edit Person
+                          </button>
+                          <button
+                            onClick={() => { setExpandedPersonId(id => id === p.id ? null : p.id); setReportsPersonId(null); setEditingId(null) }}
+                            className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Worksheets {expandedPersonId === p.id ? '↑' : '›'}
+                          </button>
+                          <button
+                            onClick={() => { setReportsPersonId(id => id === p.id ? null : p.id); setExpandedPersonId(null); setEditingId(null) }}
+                            className="text-xs font-medium text-purple-600 hover:text-purple-800 border border-purple-200 bg-purple-50 hover:bg-purple-100 px-3 py-1 rounded-lg transition-colors"
+                          >
+                            Reports {reportsPersonId === p.id ? '↑' : '›'}
+                          </button>
                         </div>
                       </td>
                     </tr>
