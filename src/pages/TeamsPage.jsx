@@ -2,8 +2,93 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
+// ── Add Members modal ─────────────────────────────────────────────────────────
+function AddMembersModal({ available, onConfirm, onClose }) {
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState(new Set())
+
+  const filtered = available.filter(p => {
+    const q = search.toLowerCase()
+    return p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+  })
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
+          <h2 className="text-base font-bold text-gray-900">Add Members to Team</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+        <div className="px-4 pt-3 pb-2 shrink-0">
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            autoFocus
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-gray-100 px-2 py-1">
+          {available.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">All participants are already on this team.</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No matches for "{search}"</p>
+          ) : (
+            filtered.map(p => (
+              <label
+                key={p.id}
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors rounded-lg ${selected.has(p.id) ? 'bg-brand-50' : 'hover:bg-gray-50'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(p.id)}
+                  onChange={() => toggle(p.id)}
+                  className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                  <p className="text-xs text-gray-400">{p.email}</p>
+                  {p.team_id && (
+                    <p className="text-xs text-amber-500 mt-0.5">Currently on another team — will be moved</p>
+                  )}
+                </div>
+              </label>
+            ))
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex items-center justify-between shrink-0">
+          <span className="text-sm text-gray-500">
+            {selected.size === 0 ? 'None selected' : `${selected.size} selected`}
+          </span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-200 transition-colors">
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm([...selected])}
+              disabled={selected.size === 0}
+              className="px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+            >
+              Add {selected.size > 0 ? `${selected.size} ` : ''}Member{selected.size !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Edit / Add panel ──────────────────────────────────────────────────────────
-function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRemove }) {
+function EditTeamPanel({ team, people, onSave, onCancel, onMemberAddBatch, onMemberRemove }) {
   const [form, setForm] = useState({
     name: team?.name ?? '',
     location: team?.location ?? '',
@@ -12,7 +97,7 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [addMemberId, setAddMemberId] = useState('')
+  const [addMembersOpen, setAddMembersOpen] = useState(false)
 
   const currentMembers = people.filter(p => p.team_id === team?.id)
   const available = people.filter(p => !p.team_id || p.team_id !== team?.id)
@@ -22,12 +107,6 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
     setSaving(true)
     await onSave({ ...form, manager_id: form.manager_id || null }, team?.id ?? null)
     setSaving(false)
-  }
-
-  async function handleAddMember() {
-    if (!addMemberId || !team) return
-    await onMemberAdd(addMemberId, team.id)
-    setAddMemberId('')
   }
 
   return (
@@ -106,7 +185,7 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
           </h3>
 
           {currentMembers.length === 0 ? (
-            <p className="text-xs text-gray-400">No members yet — use the dropdown below to add participants.</p>
+            <p className="text-xs text-gray-400">No members yet — click "Add Members" below to get started.</p>
           ) : (
             <div className="space-y-1.5">
               {currentMembers.map(p => (
@@ -129,28 +208,24 @@ function EditTeamPanel({ team, people, onSave, onCancel, onMemberAdd, onMemberRe
             </div>
           )}
 
-          {/* Add member */}
-          <div className="flex gap-2 items-center">
-            <select
-              value={addMemberId}
-              onChange={e => setAddMemberId(e.target.value)}
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
-            >
-              <option value="">Add a participant to this team…</option>
-              {available.map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.email}){p.team_id ? ' — move from another team' : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleAddMember}
-              disabled={!addMemberId}
-              className="bg-white hover:bg-gray-50 disabled:opacity-40 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors"
-            >
-              Add
-            </button>
-          </div>
+          {/* Add members */}
+          {addMembersOpen && (
+            <AddMembersModal
+              available={available}
+              onConfirm={async (ids) => {
+                await onMemberAddBatch(ids, team.id)
+                setAddMembersOpen(false)
+              }}
+              onClose={() => setAddMembersOpen(false)}
+            />
+          )}
+          <button
+            onClick={() => setAddMembersOpen(true)}
+            disabled={available.length === 0}
+            className="text-sm font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add Members to This Team
+          </button>
         </div>
       )}
     </div>
@@ -205,6 +280,12 @@ export default function TeamsPage() {
 
   async function handleMemberAdd(personId, teamId) {
     await supabase.from('people').update({ team_id: teamId }).eq('id', personId)
+    load()
+  }
+
+  async function handleMemberAddBatch(personIds, teamId) {
+    if (personIds.length === 0) return
+    await supabase.from('people').update({ team_id: teamId }).in('id', personIds)
     load()
   }
 
@@ -266,7 +347,7 @@ export default function TeamsPage() {
                       people={people}
                       onSave={handleSaveTeam}
                       onCancel={() => setEditingId(null)}
-                      onMemberAdd={handleMemberAdd}
+                      onMemberAddBatch={handleMemberAddBatch}
                       onMemberRemove={handleMemberRemove}
                     />
                   </td>
@@ -335,7 +416,7 @@ export default function TeamsPage() {
                             people={people}
                             onSave={handleSaveTeam}
                             onCancel={() => setEditingId(null)}
-                            onMemberAdd={handleMemberAdd}
+                            onMemberAddBatch={handleMemberAddBatch}
                             onMemberRemove={handleMemberRemove}
                           />
                         </td>
