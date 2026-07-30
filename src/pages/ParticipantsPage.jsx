@@ -8,7 +8,7 @@ import { parseParticipants } from '../lib/parseParticipants'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
-import PersonalInsightsModal from '../components/PersonalInsightsModal'
+import PersonalInsightsModal, { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
 import PersonalInsightsBulkModal from '../components/PersonalInsightsBulkModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
@@ -351,6 +351,56 @@ function CustomReportModal({ report, participant, onClose }) {
 // ── PersonReportsPanel ────────────────────────────────────────────────────────
 function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, onOpenCustomReport }) {
   const strengths = (person.top5 ?? []).filter(Boolean)
+  const [pdfLoading, setPdfLoading] = useState({})
+  const [copied, setCopied] = useState({})
+
+  const piUrl = `${window.location.origin}/personal-insights`
+
+  function openPrintWindow(html) {
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 250)
+  }
+
+  function handlePIPdf() {
+    openPrintWindow(buildPersonalInsightsPrintHTML(person.name, strengths))
+  }
+
+  async function handleCustomPdf(report) {
+    setPdfLoading(p => ({ ...p, [report.id]: true }))
+    const rows = report.rows ?? []
+    const map = {}
+    strengths.forEach(s => { map[s] = {} })
+    if (strengths.length > 0 && rows.length > 0) {
+      const { data } = await supabase
+        .from('report_content')
+        .select('strength_name, content')
+        .eq('report_type', report.id)
+        .in('strength_name', strengths)
+      ;(data ?? []).forEach(r => { if (r.content) map[r.strength_name] = r.content })
+    }
+    setPdfLoading(p => ({ ...p, [report.id]: false }))
+    openPrintWindow(buildCustomReportPrintHTML(report.name, person.name, strengths, rows, map))
+  }
+
+  function copyLink(key, url) {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(c => ({ ...c, [key]: true }))
+      setTimeout(() => setCopied(c => ({ ...c, [key]: false })), 2000)
+    })
+  }
+
+  function sendLink(url, reportName) {
+    const subject = encodeURIComponent(`Your ${reportName}`)
+    const body = encodeURIComponent(`Here is a link to your ${reportName}:\n${url}`)
+    window.open(`mailto:${person.email}?subject=${subject}&body=${body}`)
+  }
+
+  const actionBtn = 'text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors'
+  const actionBtnBrand = 'text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors'
+
   return (
     <div className="bg-purple-50 border-t border-purple-100 px-6 py-5">
       <div className="flex items-center justify-between mb-4">
@@ -361,33 +411,57 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
         <p className="text-sm text-gray-400">No strengths entered — reports require CliftonStrengths data.</p>
       ) : (
         <div className="space-y-1.5">
+          {/* Personal Insights */}
           <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
             <div className="flex items-center gap-2 min-w-0">
               <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Built-in</span>
-              <span className="text-sm text-gray-700">Personal Insights</span>
+              <span className="text-sm text-gray-700 truncate">Personal Insights</span>
             </div>
-            <button
-              onClick={onOpenPersonalInsights}
-              className="text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors"
-            >Open</button>
+            <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+              <button onClick={onOpenPersonalInsights} className={actionBtnBrand}>Open</button>
+              <button onClick={handlePIPdf} className={`pl-2.5 ${actionBtn}`}>↓ PDF</button>
+              <button onClick={() => copyLink('pi', piUrl)} className={`pl-2.5 ${actionBtn}`}>
+                {copied['pi'] ? '✓ Copied' : 'Copy Link'}
+              </button>
+              <button onClick={() => sendLink(piUrl, 'Personal Insights')} className={`pl-2.5 ${actionBtn}`}>
+                Send Link
+              </button>
+            </div>
           </div>
+
           {reports.length === 0 && (
             <p className="text-xs text-gray-400 pt-1">No custom reports yet. Create one on the Reports page.</p>
           )}
-          {reports.map(report => (
-            <div key={report.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm text-gray-700">{report.name}</span>
-                {(report.rows ?? []).length === 0 && (
-                  <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">No rows</span>
-                )}
+
+          {reports.map(report => {
+            const reportUrl = `${window.location.origin}/report/${report.id}`
+            return (
+              <div key={report.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-sm text-gray-700 truncate">{report.name}</span>
+                  {(report.rows ?? []).length === 0 && (
+                    <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">No rows</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+                  <button onClick={() => onOpenCustomReport(report)} className={actionBtnBrand}>Open</button>
+                  <button
+                    onClick={() => handleCustomPdf(report)}
+                    disabled={pdfLoading[report.id]}
+                    className={`pl-2.5 ${actionBtn} disabled:opacity-50`}
+                  >
+                    {pdfLoading[report.id] ? '…' : '↓ PDF'}
+                  </button>
+                  <button onClick={() => copyLink(report.id, reportUrl)} className={`pl-2.5 ${actionBtn}`}>
+                    {copied[report.id] ? '✓ Copied' : 'Copy Link'}
+                  </button>
+                  <button onClick={() => sendLink(reportUrl, report.name)} className={`pl-2.5 ${actionBtn}`}>
+                    Send Link
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => onOpenCustomReport(report)}
-                className="text-xs font-medium text-brand-500 hover:text-brand-700 transition-colors"
-              >Open</button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
