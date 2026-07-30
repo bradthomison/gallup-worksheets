@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 
-const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS)
+const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS).sort()
 
 const FIELD_LABELS = {
   description:      'Theme Description',
