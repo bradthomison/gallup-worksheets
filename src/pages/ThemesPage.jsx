@@ -1,7 +1,222 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
+import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 
+const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS)
+
+const FIELD_LABELS = {
+  description:    'Theme Description',
+  descriptiveWords: 'Descriptive Words',
+  roleIPlay:      'The Role I Play',
+  iAmBeing:       'I am (being)',
+  iWillDoing:     'I will (doing)',
+  valueIBring:    'The Value I Bring',
+  needsIHave:     'The Needs I Have (Give me…)',
+  metaphorImage:  'Metaphor / Image',
+  barrierLabel:   'Barrier Label',
+  myMotivators:   'My Motivators (I Love)',
+  myDemotivators: 'My Demotivators (I Dislike)',
+}
+
+// ── Personal Insights Report card ────────────────────────────────────────────
+function PersonalInsightsReport() {
+  const [expanded, setExpanded] = useState(false)
+  const [lmsCopied, setLmsCopied] = useState(false)
+  const [selectedStrength, setSelectedStrength] = useState('Activator')
+  const [dbContent, setDbContent] = useState({}) // { [strength]: { ...fields } }
+  const [editFields, setEditFields] = useState({}) // fields for selected strength
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [tableExists, setTableExists] = useState(true)
+
+  const lmsUrl = `${window.location.origin}/personal-insights`
+
+  function copyLmsLink() {
+    navigator.clipboard.writeText(lmsUrl).then(() => {
+      setLmsCopied(true)
+      setTimeout(() => setLmsCopied(false), 2000)
+    })
+  }
+
+  const loadContent = useCallback(async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('report_content')
+        .select('strength_name, content')
+        .eq('report_type', 'personal_insights')
+
+      if (error) {
+        // Table probably doesn't exist yet
+        setTableExists(false)
+        setLoading(false)
+        return
+      }
+
+      const merged = {}
+      ALL_STRENGTHS.forEach(s => {
+        const row = data?.find(d => d.strength_name === s)
+        merged[s] = row ? row.content : { ...PERSONAL_INSIGHTS[s] }
+      })
+      setDbContent(merged)
+    } catch {
+      setTableExists(false)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    if (expanded) loadContent()
+  }, [expanded, loadContent])
+
+  useEffect(() => {
+    if (dbContent[selectedStrength]) {
+      setEditFields({ ...dbContent[selectedStrength] })
+    } else {
+      setEditFields({ ...PERSONAL_INSIGHTS[selectedStrength] })
+    }
+    setSaved(false)
+  }, [selectedStrength, dbContent])
+
+  async function handleSave() {
+    setSaving(true)
+    const { error } = await supabase.from('report_content').upsert({
+      report_type: 'personal_insights',
+      strength_name: selectedStrength,
+      content: editFields,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'report_type,strength_name' })
+    setSaving(false)
+    if (!error) {
+      setDbContent(prev => ({ ...prev, [selectedStrength]: { ...editFields } }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
+  }
+
+  function handleReset() {
+    setEditFields({ ...PERSONAL_INSIGHTS[selectedStrength] })
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-3 text-left flex-1 min-w-0"
+        >
+          <svg
+            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <div>
+            <p className="font-semibold text-gray-900">Personal Insights</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                34 strengths · 11 fields each
+              </span>
+              <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                Pre-filled Report
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
+          {/* Acorn link */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
+              <p className="text-xs text-brand-500 truncate">{lmsUrl}</p>
+            </div>
+            <button
+              onClick={copyLmsLink}
+              className="shrink-0 ml-4 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            >
+              {lmsCopied ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+
+          {/* Content editor */}
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">Edit Strength Content</p>
+              {!tableExists && (
+                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  Run SQL migration to enable editing
+                </span>
+              )}
+            </div>
+
+            {loading ? (
+              <p className="text-sm text-gray-400 px-4 py-6">Loading…</p>
+            ) : (
+              <div className="p-4 space-y-4">
+                {/* Strength selector */}
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select strength:</label>
+                  <select
+                    value={selectedStrength}
+                    onChange={e => setSelectedStrength(e.target.value)}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+                  >
+                    {ALL_STRENGTHS.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Fields */}
+                <div className="space-y-3">
+                  {Object.entries(FIELD_LABELS).map(([key, label]) => (
+                    <div key={key}>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                      <textarea
+                        value={editFields[key] ?? ''}
+                        onChange={e => setEditFields(f => ({ ...f, [key]: e.target.value }))}
+                        rows={key === 'description' ? 3 : 2}
+                        disabled={!tableExists}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y disabled:bg-gray-50 disabled:text-gray-400"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {tableExists && (
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                    >
+                      {saving ? 'Saving…' : `Save ${selectedStrength}`}
+                    </button>
+                    <button
+                      onClick={handleReset}
+                      className="text-sm text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg transition-colors"
+                    >
+                      Reset to default
+                    </button>
+                    {saved && <span className="text-sm text-green-600">✓ Saved</span>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Theme row (unchanged) ─────────────────────────────────────────────────────
 function ThemeRow({ theme, creatorName, onSave, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(theme.name)
@@ -48,7 +263,6 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Header row */}
       <div className="flex items-center justify-between px-5 py-4">
         <button
           onClick={() => setExpanded(e => !e)}
@@ -90,10 +304,8 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
         </div>
       </div>
 
-      {/* Expanded content */}
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50">
-          {/* LMS Link */}
           <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 mb-4">
             <div className="min-w-0">
               <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
@@ -156,9 +368,10 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
   )
 }
 
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function ThemesPage() {
   const [themes, setThemes] = useState([])
-  const [profiles, setProfiles] = useState({}) // { uuid: display_name }
+  const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
   const [addingNew, setAddingNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -216,8 +429,8 @@ export default function ThemesPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Session Themes</h1>
-          <p className="text-sm text-gray-500 mt-1">Reusable prompt sets you can load when creating a session.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Themes and Reports</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage session prompt themes and pre-filled reports.</p>
         </div>
         <button
           onClick={() => { setAddingNew(true); setSaveError(null) }}
@@ -275,26 +488,38 @@ export default function ThemesPage() {
         </div>
       )}
 
-      {loading ? (
-        <p className="text-gray-500 text-sm">Loading…</p>
-      ) : themes.length === 0 && !addingNew ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
-          <p className="text-gray-500 mb-1">No themes yet.</p>
-          <p className="text-sm text-gray-400">Create your first theme to reuse prompts across sessions.</p>
-        </div>
-      ) : (
+      {/* Session Themes */}
+      <div className="mb-2">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Session Themes</h2>
+        {loading ? (
+          <p className="text-gray-500 text-sm">Loading…</p>
+        ) : themes.length === 0 && !addingNew ? (
+          <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
+            <p className="text-gray-500 mb-1">No themes yet.</p>
+            <p className="text-sm text-gray-400">Create your first theme to reuse prompts across sessions.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {themes.map(t => (
+              <ThemeRow
+                key={t.id}
+                theme={t}
+                creatorName={profiles[t.created_by] ?? t.created_by_email?.split('@')[0] ?? null}
+                onSave={handleSaveEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Reports */}
+      <div className="mt-8">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Reports</h2>
         <div className="space-y-3">
-          {themes.map(t => (
-            <ThemeRow
-              key={t.id}
-              theme={t}
-              creatorName={profiles[t.created_by] ?? t.created_by_email?.split('@')[0] ?? null}
-              onSave={handleSaveEdit}
-              onDelete={handleDelete}
-            />
-          ))}
+          <PersonalInsightsReport />
         </div>
-      )}
+      </div>
     </Layout>
   )
 }
