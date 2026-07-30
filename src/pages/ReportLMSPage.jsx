@@ -1,24 +1,23 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
 import SiteFooter from '../components/SiteFooter'
 
-function buildReportPrintHTML(reportName, personName, strengths, insights) {
+function buildReportPrintHTML(reportName, personName, strengths, rows, insights) {
   const colWidth = Math.floor((100 - 16) / strengths.length)
-  const rows = ROWS.map(row => {
-    const cells = strengths.map(s => {
-      const val = insights?.[s]?.[row.key] ?? ''
-      return `<td style="border:1px solid #d1d5db;padding:3px 5px;font-size:8px;color:#374151;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${val}</td>`
-    }).join('')
-    const label = row.key === 'description' ? personName : row.label
-    return `<tr><th style="width:145px;border:1px solid #d1d5db;background:#f9fafb;padding:3px 5px;font-size:8px;font-weight:600;color:#374151;text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${label}</th>${cells}</tr>`
-  }).join('')
 
-  const headers = strengths.map(s => {
+  const headerCells = strengths.map(s => {
     const c = getStrengthColors(s)
     return `<th style="width:${colWidth}%;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};padding:4px 5px;font-size:9px;font-weight:700;text-align:center;">${s}</th>`
+  }).join('')
+
+  const bodyRows = rows.map(row => {
+    const cells = strengths.map(s => {
+      const val = insights?.[s]?.[row.id] ?? ''
+      return `<td style="border:1px solid #d1d5db;padding:3px 5px;font-size:8px;color:#374151;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${val}</td>`
+    }).join('')
+    return `<tr><th style="width:145px;border:1px solid #d1d5db;background:#f9fafb;padding:3px 5px;font-size:8px;font-weight:600;color:#374151;text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>${cells}</tr>`
   }).join('')
 
   return `<!DOCTYPE html><html><head><title>${reportName} — ${personName}</title>
@@ -38,8 +37,8 @@ print-color-adjust:exact;
 <h2>${reportName} — ${personName}</h2>
 <table>
 <colgroup><col style="width:145px;"/>${strengths.map(() => `<col style="width:${colWidth}%;"/>`).join('')}</colgroup>
-<thead><tr><th style="border:1px solid #d1d5db;background:#f9fafb;"></th>${headers}</tr></thead>
-<tbody>${rows}</tbody>
+<thead><tr><th style="border:1px solid #d1d5db;background:#f9fafb;"></th>${headerCells}</tr></thead>
+<tbody>${bodyRows}</tbody>
 <tfoot><tr><td colspan="${strengths.length + 1}">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</td></tr></tfoot>
 </table>
 </body></html>`
@@ -47,7 +46,7 @@ print-color-adjust:exact;
 
 export default function ReportLMSPage() {
   const { reportId } = useParams()
-  const [reportName, setReportName] = useState('')
+  const [report, setReport] = useState(null)
   const [reportLoading, setReportLoading] = useState(true)
   const [reportNotFound, setReportNotFound] = useState(false)
 
@@ -61,12 +60,11 @@ export default function ReportLMSPage() {
     async function loadReport() {
       const { data, error: err } = await supabase
         .from('reports')
-        .select('id, name')
+        .select('id, name, rows')
         .eq('id', reportId)
         .single()
-
       if (err || !data) { setReportNotFound(true) }
-      else { setReportName(data.name) }
+      else { setReport(data) }
       setReportLoading(false)
     }
     loadReport()
@@ -112,6 +110,7 @@ export default function ReportLMSPage() {
   }
 
   const strengths = person?.top5?.filter(Boolean) ?? []
+  const rows = report?.rows ?? []
 
   if (reportLoading) {
     return (
@@ -158,7 +157,7 @@ export default function ReportLMSPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                   </svg>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">{reportName}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{report.name}</h1>
                 <p className="text-sm text-gray-500 mt-1">
                   Enter the email address your coach has on file to view your report.
                 </p>
@@ -206,12 +205,12 @@ export default function ReportLMSPage() {
           <div>
             <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{reportName}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">{report.name}</h1>
                 <p className="text-gray-500 text-sm mt-0.5">{person.name}</p>
               </div>
               <button
                 onClick={() => {
-                  const html = buildReportPrintHTML(reportName, person.name, strengths, insights)
+                  const html = buildReportPrintHTML(report.name, person.name, strengths, rows, insights)
                   const win = window.open('', '_blank')
                   win.document.write(html)
                   win.document.close()
@@ -227,49 +226,58 @@ export default function ReportLMSPage() {
               </button>
             </div>
 
-            <div className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-4"
-              style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
-              <table className="w-full border-collapse text-sm" style={{ minWidth: `${150 + strengths.length * 180}px` }}>
-                <colgroup>
-                  <col style={{ width: '150px' }} />
-                  {strengths.map(s => <col key={s} />)}
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th className="border border-gray-200 bg-gray-50 p-3" />
-                    {strengths.map(s => {
-                      const c = getStrengthColors(s)
-                      return (
-                        <th
-                          key={s}
-                          className="border border-gray-200 p-3 text-center font-bold"
-                          style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
-                        >
-                          {s}
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {ROWS.map(row => (
-                    <tr key={row.key} className="even:bg-gray-50/50">
-                      <th className="border border-gray-200 bg-gray-50 p-3 text-left text-xs font-semibold text-gray-700 align-top whitespace-nowrap">
-                        {row.key === 'description' ? person.name : row.label}
-                      </th>
-                      {strengths.map(s => (
-                        <td key={s} className="border border-gray-200 p-3 text-xs text-gray-700 align-top leading-relaxed">
-                          {insights?.[s]?.[row.key] ?? ''}
-                        </td>
+            {rows.length === 0 ? (
+              <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
+                <p className="text-gray-500">This report has no rows defined yet.</p>
+                <p className="text-sm text-gray-400 mt-1">Please contact your coach.</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-4"
+                  style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
+                  <table className="w-full border-collapse text-sm" style={{ minWidth: `${150 + strengths.length * 180}px` }}>
+                    <colgroup>
+                      <col style={{ width: '150px' }} />
+                      {strengths.map(s => <col key={s} />)}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-200 bg-gray-50 p-3" />
+                        {strengths.map(s => {
+                          const c = getStrengthColors(s)
+                          return (
+                            <th
+                              key={s}
+                              className="border border-gray-200 p-3 text-center font-bold"
+                              style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                            >
+                              {s}
+                            </th>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(row => (
+                        <tr key={row.id} className="even:bg-gray-50/50">
+                          <th className="border border-gray-200 bg-gray-50 p-3 text-left text-xs font-semibold text-gray-700 align-top">
+                            {row.label}
+                          </th>
+                          {strengths.map(s => (
+                            <td key={s} className="border border-gray-200 p-3 text-xs text-gray-700 align-top leading-relaxed">
+                              {insights?.[s]?.[row.id] ?? ''}
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-gray-400 mb-2">
-              Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
-            </p>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">
+                  Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
+                </p>
+              </>
+            )}
           </div>
         )}
       </main>

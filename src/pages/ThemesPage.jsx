@@ -19,7 +19,7 @@ const FIELD_LABELS = {
   myDemotivators:   'My Demotivators (I Dislike)',
 }
 
-// ── Shared strength content editor ───────────────────────────────────────────
+// ── Personal Insights strength content editor (fixed 11 fields) ───────────────
 function StrengthContentEditor({ reportType, staticFallback }) {
   const [selectedStrength, setSelectedStrength] = useState('Activator')
   const [dbContent, setDbContent] = useState({})
@@ -49,7 +49,6 @@ function StrengthContentEditor({ reportType, staticFallback }) {
     setLoading(false)
   }, [reportType, staticFallback])
 
-  // Load once on mount
   useEffect(() => { loadContent() }, [loadContent])
 
   useEffect(() => {
@@ -146,6 +145,112 @@ function StrengthContentEditor({ reportType, staticFallback }) {
   )
 }
 
+// ── Custom report strength content editor (dynamic rows) ─────────────────────
+function CustomStrengthContentEditor({ reportType, rows }) {
+  const [selectedStrength, setSelectedStrength] = useState('Activator')
+  const [dbContent, setDbContent] = useState({})
+  const [editFields, setEditFields] = useState({})
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  const loadContent = useCallback(async () => {
+    if (rows.length === 0) return
+    setLoading(true)
+    const { data } = await supabase
+      .from('report_content')
+      .select('strength_name, content')
+      .eq('report_type', reportType)
+    const merged = {}
+    ALL_STRENGTHS.forEach(s => {
+      const row = data?.find(d => d.strength_name === s)
+      merged[s] = row?.content ?? {}
+    })
+    setDbContent(merged)
+    setLoading(false)
+  }, [reportType, rows])
+
+  useEffect(() => { loadContent() }, [loadContent])
+
+  useEffect(() => {
+    setEditFields(dbContent[selectedStrength] ? { ...dbContent[selectedStrength] } : {})
+    setSaved(false)
+  }, [selectedStrength, dbContent])
+
+  async function handleSave() {
+    setSaving(true)
+    const { error } = await supabase.from('report_content').upsert({
+      report_type: reportType,
+      strength_name: selectedStrength,
+      content: editFields,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'report_type,strength_name' })
+    setSaving(false)
+    if (!error) {
+      setDbContent(prev => ({ ...prev, [selectedStrength]: { ...editFields } }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg px-4 py-6 text-center">
+        <p className="text-sm text-gray-400">Define rows above to start editing strength content.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-800">Edit Strength Content</p>
+      </div>
+      {loading ? (
+        <p className="text-sm text-gray-400 px-4 py-6">Loading…</p>
+      ) : (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select strength:</label>
+            <select
+              value={selectedStrength}
+              onChange={e => setSelectedStrength(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+            >
+              {ALL_STRENGTHS.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-3">
+            {rows.map(row => (
+              <div key={row.id}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{row.label}</label>
+                <textarea
+                  value={editFields[row.id] ?? ''}
+                  onChange={e => setEditFields(f => ({ ...f, [row.id]: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+            >
+              {saving ? 'Saving…' : `Save ${selectedStrength}`}
+            </button>
+            {saved && <span className="text-sm text-green-600">✓ Saved</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Personal Insights card (built-in report) ─────────────────────────────────
 function PersonalInsightsReport() {
   const [expanded, setExpanded] = useState(false)
@@ -209,14 +314,23 @@ function PersonalInsightsReport() {
 }
 
 // ── Custom report card ────────────────────────────────────────────────────────
-function CustomReportCard({ report, onDelete }) {
+function CustomReportCard({ report: initialReport, onDelete }) {
+  const [report, setReport] = useState(initialReport)
   const [expanded, setExpanded] = useState(false)
   const [lmsCopied, setLmsCopied] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [nameInput, setNameInput] = useState(report.name)
-  const [nameSaving, setNameSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // Name editing
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState(initialReport.name)
+  const [nameSaving, setNameSaving] = useState(false)
+
+  // Row management
+  const [editingRows, setEditingRows] = useState(false)
+  const [draftRows, setDraftRows] = useState([])
+  const [rowsSaving, setRowsSaving] = useState(false)
+
+  const rows = report.rows ?? []
   const lmsUrl = `${window.location.origin}/report/${report.id}`
 
   function copyLmsLink() {
@@ -226,13 +340,49 @@ function CustomReportCard({ report, onDelete }) {
     })
   }
 
+  function startEditRows() {
+    setDraftRows(rows.map(r => ({ ...r })))
+    setEditingRows(true)
+  }
+
+  function addRow() {
+    setDraftRows(prev => [...prev, { id: `row_${Date.now()}`, label: '' }])
+  }
+
+  function updateRowLabel(id, label) {
+    setDraftRows(prev => prev.map(r => r.id === id ? { ...r, label } : r))
+  }
+
+  function removeRow(id) {
+    setDraftRows(prev => prev.filter(r => r.id !== id))
+  }
+
+  async function saveRows() {
+    const validRows = draftRows.filter(r => r.label.trim()).map(r => ({ ...r, label: r.label.trim() }))
+    setRowsSaving(true)
+    const { data } = await supabase
+      .from('reports')
+      .update({ rows: validRows })
+      .eq('id', report.id)
+      .select()
+      .single()
+    setRowsSaving(false)
+    if (data) setReport(data)
+    setEditingRows(false)
+  }
+
   async function handleSaveName() {
     if (!nameInput.trim()) return
     setNameSaving(true)
-    await supabase.from('reports').update({ name: nameInput.trim() }).eq('id', report.id)
+    const { data } = await supabase
+      .from('reports')
+      .update({ name: nameInput.trim() })
+      .eq('id', report.id)
+      .select()
+      .single()
     setNameSaving(false)
-    setEditing(false)
-    report.name = nameInput.trim()
+    if (data) setReport(data)
+    setEditingName(false)
   }
 
   return (
@@ -252,7 +402,7 @@ function CustomReportCard({ report, onDelete }) {
             <p className="font-semibold text-gray-900">{report.name}</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                34 strengths · 11 fields each
+                {rows.length} row{rows.length !== 1 ? 's' : ''} · 34 strengths
               </span>
             </div>
           </div>
@@ -267,13 +417,10 @@ function CustomReportCard({ report, onDelete }) {
           ) : (
             <>
               <button
-                onClick={() => { setEditing(true); setExpanded(true) }}
+                onClick={() => { setNameInput(report.name); setEditingName(true); setExpanded(true) }}
                 className="text-xs text-brand-500 font-medium hover:underline"
               >Rename</button>
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="text-xs text-red-400 font-medium hover:underline"
-              >Delete</button>
+              <button onClick={() => setConfirmDelete(true)} className="text-xs text-red-400 font-medium hover:underline">Delete</button>
             </>
           )}
         </div>
@@ -281,13 +428,13 @@ function CustomReportCard({ report, onDelete }) {
 
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
-          {/* Rename inline */}
-          {editing && (
+          {/* Rename */}
+          {editingName && (
             <div className="flex items-center gap-2 bg-white border border-brand-200 rounded-lg px-4 py-3">
               <input
                 value={nameInput}
                 onChange={e => setNameInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditing(false) }}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') setEditingName(false) }}
                 className="flex-1 text-sm border-none outline-none bg-transparent"
                 autoFocus
               />
@@ -296,7 +443,7 @@ function CustomReportCard({ report, onDelete }) {
                 disabled={nameSaving || !nameInput.trim()}
                 className="text-xs font-medium text-brand-500 hover:text-brand-700 disabled:opacity-60"
               >{nameSaving ? '…' : 'Save'}</button>
-              <button onClick={() => setEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+              <button onClick={() => setEditingName(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
             </div>
           )}
 
@@ -314,8 +461,81 @@ function CustomReportCard({ report, onDelete }) {
             </button>
           </div>
 
-          {/* Content editor — no static fallback for custom reports */}
-          <StrengthContentEditor reportType={report.id} staticFallback={null} />
+          {/* Row management */}
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">Report Rows</p>
+              {!editingRows && (
+                <button
+                  onClick={startEditRows}
+                  className="text-xs text-brand-500 font-medium hover:underline"
+                >
+                  {rows.length === 0 ? 'Add Rows' : 'Edit Rows'}
+                </button>
+              )}
+            </div>
+
+            {editingRows ? (
+              <div className="p-4 space-y-3">
+                {draftRows.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-2">No rows yet. Add your first row below.</p>
+                )}
+                {draftRows.map((row, i) => (
+                  <div key={row.id} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i + 1}.</span>
+                    <input
+                      value={row.label}
+                      onChange={e => updateRowLabel(row.id, e.target.value)}
+                      placeholder="Row label e.g. Theme Description"
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      autoFocus={i === draftRows.length - 1 && row.label === ''}
+                    />
+                    <button
+                      onClick={() => removeRow(row.id)}
+                      className="text-xs text-red-400 hover:text-red-600 shrink-0"
+                    >Remove</button>
+                  </div>
+                ))}
+                <button
+                  onClick={addRow}
+                  className="text-xs text-brand-500 font-medium hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  + Add Row
+                </button>
+                <div className="flex gap-2 pt-1 border-t border-gray-100">
+                  <button
+                    onClick={saveRows}
+                    disabled={rowsSaving}
+                    className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                  >
+                    {rowsSaving ? 'Saving…' : 'Save Rows'}
+                  </button>
+                  <button
+                    onClick={() => setEditingRows(false)}
+                    className="text-sm text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="px-4 py-6 text-center">
+                <p className="text-sm text-gray-400">No rows defined yet. Click "Add Rows" to get started.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {rows.map((row, i) => (
+                  <div key={row.id} className="px-4 py-2 flex items-center gap-3">
+                    <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i + 1}.</span>
+                    <span className="text-sm text-gray-700">{row.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Strength content editor */}
+          <CustomStrengthContentEditor reportType={report.id} rows={rows} />
         </div>
       )}
     </div>
@@ -506,8 +726,7 @@ export default function ThemesPage() {
   }
 
   async function handleSaveThemeEdit(id, updates) {
-    const { error } = await supabase.from('prompt_themes').update(updates).eq('id', id)
-    if (error) { setThemeSaveError(error.message); return }
+    await supabase.from('prompt_themes').update(updates).eq('id', id)
     load()
   }
 
@@ -545,6 +764,7 @@ export default function ThemesPage() {
     const { error } = await supabase.from('reports').insert({
       name: newReportName.trim(),
       created_by: user.id,
+      rows: [],
     })
     setReportSaving(false)
     if (error) { setReportSaveError(error.message); return }
