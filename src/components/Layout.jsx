@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -12,6 +12,18 @@ export default function Layout({ children }) {
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [nameSaving, setNameSaving] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (moreRef.current && !moreRef.current.contains(e.target)) {
+        setMoreOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -47,15 +59,44 @@ export default function Layout({ children }) {
             <Link to="/participants" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Participants
             </Link>
-            <Link to="/teams" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
-              Teams
-            </Link>
-            <Link to="/themes" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
-              Themes and Reports
-            </Link>
-            <Link to="/lms-learners" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
-              LMS Learners
-            </Link>
+
+            {/* More dropdown */}
+            <div className="relative" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen(o => !o)}
+                className="flex items-center gap-1.5 text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                More
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50">
+                  <Link
+                    to="/teams"
+                    onClick={() => setMoreOpen(false)}
+                    className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  >
+                    Teams
+                  </Link>
+                  <Link
+                    to="/themes"
+                    onClick={() => setMoreOpen(false)}
+                    className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  >
+                    Themes and Reports
+                  </Link>
+                  <Link
+                    to="/lms-learners"
+                    onClick={() => setMoreOpen(false)}
+                    className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  >
+                    LMS Learners
+                  </Link>
+                </div>
+              )}
+            </div>
 
             {/* User name + sign out */}
             <div className="flex items-center gap-3 border-l border-gray-200 pl-6">
