@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
@@ -731,6 +731,7 @@ function PersonWorksheetPanel({ person, onClose }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ParticipantsPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [people, setPeople] = useState([])
   const [teams, setTeams] = useState([])
   const [loading, setLoading] = useState(true)
@@ -741,7 +742,7 @@ export default function ParticipantsPage() {
   const [pasteErrors, setPasteErrors] = useState([])
   const [pasteSaving, setPasteSaving] = useState(false)
   const [pasteTeamId, setPasteTeamId] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(() => searchParams.get('team') ?? '')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [saveError, setSaveError] = useState(null)
   const [expandedPersonId, setExpandedPersonId] = useState(null)

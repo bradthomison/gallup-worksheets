@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
@@ -378,9 +379,12 @@ export default function TeamsPage() {
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
+                        <Link
+                          to={`/participants?team=${encodeURIComponent(team.name)}`}
+                          className="text-xs bg-gray-100 text-gray-600 hover:bg-brand-50 hover:text-brand-600 px-2 py-0.5 rounded-full font-medium transition-colors"
+                        >
                           {memberCount} {memberCount === 1 ? 'member' : 'members'}
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {deleteConfirm === team.id ? (
