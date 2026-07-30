@@ -53,7 +53,7 @@ export default function Layout({ children }) {
             <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
           </Link>
           <div className="flex items-center gap-6">
-            <Link to="/" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
+            <Link to="/sessions" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               Sessions
             </Link>
             <Link to="/participants" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">

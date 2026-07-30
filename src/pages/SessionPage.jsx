@@ -415,7 +415,7 @@ export default function SessionPage() {
   async function handleDelete() {
     setDeleting(true)
     await supabase.from('sessions').delete().eq('id', id)
-    navigate('/')
+    navigate('/sessions')
   }
 
   async function handleArchive(archive) {
@@ -578,7 +578,7 @@ export default function SessionPage() {
       )}
 
       <div className="mb-1">
-        <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← All sessions</Link>
+        <Link to="/sessions" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← All sessions</Link>
       </div>
 
       {/* Row 1 — title + counts */}
