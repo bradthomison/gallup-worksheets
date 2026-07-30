@@ -51,7 +51,7 @@ export default function Layout({ children }) {
               Teams
             </Link>
             <Link to="/themes" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
-              Themes
+              Themes and Reports
             </Link>
             <Link to="/lms-learners" className="text-base text-gray-700 hover:text-gray-900 font-semibold transition-colors">
               LMS Learners

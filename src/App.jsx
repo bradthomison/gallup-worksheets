@@ -13,6 +13,7 @@ import LMSLandingPage from './pages/LMSLandingPage'
 import LMSWorksheetPage from './pages/LMSWorksheetPage'
 import LMSLearnersPage from './pages/LMSLearnersPage'
 import PersonalInsightsLMSPage from './pages/PersonalInsightsLMSPage'
+import ReportLMSPage from './pages/ReportLMSPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/lms/:themeId" element={<LMSLandingPage />} />
       <Route path="/lms-worksheet/:slug" element={<LMSWorksheetPage />} />
       <Route path="/personal-insights" element={<PersonalInsightsLMSPage />} />
+      <Route path="/report/:reportId" element={<ReportLMSPage />} />
       <Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
       <Route path="/sessions/:id" element={<PrivateRoute><SessionPage /></PrivateRoute>} />
