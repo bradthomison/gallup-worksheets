@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
 
@@ -54,14 +55,30 @@ ${headerCells}
 export default function PersonalInsightsModal({ participant, onClose }) {
   const strengths = (participant.top5 || []).filter(Boolean)
   const validStrengths = strengths.filter(s => PERSONAL_INSIGHTS[s])
+  const [copied, setCopied] = useState(false)
 
-  function handlePrint() {
+  const lmsUrl = `${window.location.origin}/personal-insights`
+
+  function openPrintWindow() {
     const html = buildPersonalInsightsPrintHTML(participant.name, strengths)
     const win = window.open('', '_blank')
     win.document.write(html)
     win.document.close()
     win.focus()
     setTimeout(() => win.print(), 250)
+  }
+
+  function copyLink() {
+    navigator.clipboard.writeText(lmsUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function sendLink() {
+    const subject = encodeURIComponent('Your Personal Insights')
+    const body = encodeURIComponent(`Here is a link to your Personal Insights:\n${lmsUrl}`)
+    window.open(`mailto:${participant.email}?subject=${subject}&body=${body}`)
   }
 
   if (strengths.length === 0) {
@@ -86,14 +103,23 @@ export default function PersonalInsightsModal({ participant, onClose }) {
             <p className="text-sm text-gray-500">{participant.name}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={sendLink} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+              Send Link
+            </button>
+            <button onClick={copyLink} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+              {copied ? '✓ Copied' : 'Copy Link'}
+            </button>
+            <button onClick={openPrintWindow} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
+              ↓ PDF
+            </button>
             <button
-              onClick={handlePrint}
+              onClick={openPrintWindow}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
-              Print / PDF
+              Print
             </button>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
