@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
+import { supabase } from '../lib/supabase'
+import { downloadPersonalInsightsPDF } from '../lib/downloadReportPDF'
 
 // Builds a standalone print-ready HTML page for one participant
 export function buildPersonalInsightsPrintHTML(name, strengths) {
@@ -56,8 +58,10 @@ export default function PersonalInsightsModal({ participant, onClose }) {
   const strengths = (participant.top5 || []).filter(Boolean)
   const validStrengths = strengths.filter(s => PERSONAL_INSIGHTS[s])
   const [copied, setCopied] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [sendLoading, setSendLoading] = useState(false)
 
-  const lmsUrl = `${window.location.origin}/personal-insights`
+  const lmsUrl = `${window.location.origin}/personal-insights?email=${encodeURIComponent(participant.email ?? '')}`
 
   function openPrintWindow() {
     const html = buildPersonalInsightsPrintHTML(participant.name, strengths)
@@ -68,6 +72,12 @@ export default function PersonalInsightsModal({ participant, onClose }) {
     setTimeout(() => win.print(), 250)
   }
 
+  async function handlePdf() {
+    setPdfLoading(true)
+    await downloadPersonalInsightsPDF(participant)
+    setPdfLoading(false)
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(lmsUrl).then(() => {
       setCopied(true)
@@ -75,10 +85,19 @@ export default function PersonalInsightsModal({ participant, onClose }) {
     })
   }
 
-  function sendLink() {
-    const subject = encodeURIComponent('Your Personal Insights')
-    const body = encodeURIComponent(`Here is a link to your Personal Insights:\n${lmsUrl}`)
-    window.open(`mailto:${participant.email}?subject=${subject}&body=${body}`)
+  async function sendLink() {
+    setSendLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.functions.invoke('send-report-link', {
+      body: {
+        to_email: participant.email,
+        to_name: participant.name,
+        report_name: 'Personal Insights',
+        report_url: lmsUrl,
+        coach_id: user?.id,
+      },
+    })
+    setSendLoading(false)
   }
 
   if (strengths.length === 0) {
@@ -103,14 +122,14 @@ export default function PersonalInsightsModal({ participant, onClose }) {
             <p className="text-sm text-gray-500">{participant.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={sendLink} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
-              Send Link
+            <button onClick={sendLink} disabled={sendLoading} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm font-medium transition-colors">
+              {sendLoading ? '…' : 'Send Link'}
             </button>
             <button onClick={copyLink} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
               {copied ? '✓ Copied' : 'Copy Link'}
             </button>
-            <button onClick={openPrintWindow} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors">
-              ↓ PDF
+            <button onClick={handlePdf} disabled={pdfLoading} className="px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm font-medium transition-colors">
+              {pdfLoading ? '…' : '↓ PDF'}
             </button>
             <button
               onClick={openPrintWindow}

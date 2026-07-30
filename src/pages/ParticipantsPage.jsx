@@ -6,6 +6,7 @@ import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN, getStrengthColors } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
+import { downloadPersonalInsightsPDF, downloadCustomReportPDF } from '../lib/downloadReportPDF'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import PersonalInsightsModal, { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
@@ -353,8 +354,9 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
   const strengths = (person.top5 ?? []).filter(Boolean)
   const [pdfLoading, setPdfLoading] = useState({})
   const [copied, setCopied] = useState({})
+  const [sendLoading, setSendLoading] = useState({})
 
-  const piUrl = `${window.location.origin}/personal-insights`
+  const piUrl = `${window.location.origin}/personal-insights?email=${encodeURIComponent(person.email ?? '')}`
 
   function openPrintWindow(html) {
     const win = window.open('', '_blank')
@@ -364,8 +366,10 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
     setTimeout(() => win.print(), 250)
   }
 
-  function handlePIPdf() {
-    openPrintWindow(buildPersonalInsightsPrintHTML(person.name, strengths))
+  async function handlePIPdf() {
+    setPdfLoading(p => ({ ...p, pi: true }))
+    await downloadPersonalInsightsPDF(person)
+    setPdfLoading(p => ({ ...p, pi: false }))
   }
 
   async function handleCustomPdf(report) {
@@ -381,8 +385,8 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
         .in('strength_name', strengths)
       ;(data ?? []).forEach(r => { if (r.content) map[r.strength_name] = r.content })
     }
+    await downloadCustomReportPDF(report.name, person, rows, map)
     setPdfLoading(p => ({ ...p, [report.id]: false }))
-    openPrintWindow(buildCustomReportPrintHTML(report.name, person.name, strengths, rows, map))
   }
 
   function copyLink(key, url) {
@@ -392,10 +396,19 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
     })
   }
 
-  function sendLink(url, reportName) {
-    const subject = encodeURIComponent(`Your ${reportName}`)
-    const body = encodeURIComponent(`Here is a link to your ${reportName}:\n${url}`)
-    window.open(`mailto:${person.email}?subject=${subject}&body=${body}`)
+  async function sendLink(url, reportName, key) {
+    setSendLoading(s => ({ ...s, [key]: true }))
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.functions.invoke('send-report-link', {
+      body: {
+        to_email: person.email,
+        to_name: person.name,
+        report_name: reportName,
+        report_url: url,
+        coach_id: user?.id,
+      },
+    })
+    setSendLoading(s => ({ ...s, [key]: false }))
   }
 
   const actionBtn = 'text-xs font-medium text-gray-500 hover:text-gray-900 transition-colors'
@@ -419,12 +432,14 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
             </div>
             <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
               <button onClick={onOpenPersonalInsights} className={actionBtnBrand}>Open</button>
-              <button onClick={handlePIPdf} className={`pl-2.5 ${actionBtn}`}>↓ PDF</button>
+              <button onClick={handlePIPdf} disabled={pdfLoading['pi']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {pdfLoading['pi'] ? '…' : '↓ PDF'}
+              </button>
               <button onClick={() => copyLink('pi', piUrl)} className={`pl-2.5 ${actionBtn}`}>
                 {copied['pi'] ? '✓ Copied' : 'Copy Link'}
               </button>
-              <button onClick={() => sendLink(piUrl, 'Personal Insights')} className={`pl-2.5 ${actionBtn}`}>
-                Send Link
+              <button onClick={() => sendLink(piUrl, 'Personal Insights', 'pi')} disabled={sendLoading['pi']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {sendLoading['pi'] ? '…' : 'Send Link'}
               </button>
             </div>
           </div>
@@ -434,7 +449,7 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
           )}
 
           {reports.map(report => {
-            const reportUrl = `${window.location.origin}/report/${report.id}`
+            const reportUrl = `${window.location.origin}/report/${report.id}?email=${encodeURIComponent(person.email ?? '')}`
             return (
               <div key={report.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -455,8 +470,8 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
                   <button onClick={() => copyLink(report.id, reportUrl)} className={`pl-2.5 ${actionBtn}`}>
                     {copied[report.id] ? '✓ Copied' : 'Copy Link'}
                   </button>
-                  <button onClick={() => sendLink(reportUrl, report.name)} className={`pl-2.5 ${actionBtn}`}>
-                    Send Link
+                  <button onClick={() => sendLink(reportUrl, report.name, report.id)} disabled={sendLoading[report.id]} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                    {sendLoading[report.id] ? '…' : 'Send Link'}
                   </button>
                 </div>
               </div>

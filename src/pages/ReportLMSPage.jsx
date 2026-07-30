@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getStrengthColors } from '../lib/strengthColors'
 import SiteFooter from '../components/SiteFooter'
@@ -46,11 +46,14 @@ print-color-adjust:exact;
 
 export default function ReportLMSPage() {
   const { reportId } = useParams()
+  const [searchParams] = useSearchParams()
+  const emailParam = searchParams.get('email')
+
   const [report, setReport] = useState(null)
   const [reportLoading, setReportLoading] = useState(true)
   const [reportNotFound, setReportNotFound] = useState(false)
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(emailParam ?? '')
   const [loading, setLoading] = useState(false)
   const [person, setPerson] = useState(null)
   const [insights, setInsights] = useState(null)
@@ -70,15 +73,13 @@ export default function ReportLMSPage() {
     loadReport()
   }, [reportId])
 
-  async function handleLookup(e) {
-    e.preventDefault()
-    if (!email.trim()) return
+  async function lookupByEmail(emailVal) {
     setLoading(true)
     setError(null)
     setPerson(null)
 
     const { data, error: rpcErr } = await supabase
-      .rpc('get_personal_insights_by_email', { p_email: email.trim().toLowerCase() })
+      .rpc('get_personal_insights_by_email', { p_email: emailVal.trim().toLowerCase() })
 
     setLoading(false)
 
@@ -108,6 +109,16 @@ export default function ReportLMSPage() {
 
     setInsights(map)
   }
+
+  async function handleLookup(e) {
+    e.preventDefault()
+    if (!email.trim()) return
+    await lookupByEmail(email)
+  }
+
+  useEffect(() => {
+    if (emailParam) lookupByEmail(emailParam)
+  }, [])
 
   const strengths = person?.top5?.filter(Boolean) ?? []
   const rows = report?.rows ?? []
@@ -148,7 +159,11 @@ export default function ReportLMSPage() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
-        {!person ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <p className="text-gray-400 text-sm">Loading…</p>
+          </div>
+        ) : !person ? (
           <div className="max-w-md mx-auto">
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
               <div className="mb-6">

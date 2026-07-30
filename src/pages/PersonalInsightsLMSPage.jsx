@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
@@ -6,28 +7,26 @@ import { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsMo
 import SiteFooter from '../components/SiteFooter'
 
 export default function PersonalInsightsLMSPage() {
-  const [email, setEmail] = useState('')
+  const [searchParams] = useSearchParams()
+  const emailParam = searchParams.get('email')
+
+  const [email, setEmail] = useState(emailParam ?? '')
   const [loading, setLoading] = useState(false)
-  const [person, setPerson] = useState(null) // { name, top5: string[] }
-  const [insights, setInsights] = useState(null) // merged content map keyed by strength
+  const [person, setPerson] = useState(null)
+  const [insights, setInsights] = useState(null)
   const [error, setError] = useState(null)
 
-  async function handleLookup(e) {
-    e.preventDefault()
-    if (!email.trim()) return
+  async function lookupByEmail(emailVal) {
     setLoading(true)
     setError(null)
     setPerson(null)
 
     const { data, error: rpcErr } = await supabase
-      .rpc('get_personal_insights_by_email', { p_email: email.trim().toLowerCase() })
+      .rpc('get_personal_insights_by_email', { p_email: emailVal.trim().toLowerCase() })
 
     setLoading(false)
 
-    if (rpcErr) {
-      setError('An error occurred. Please try again.')
-      return
-    }
+    if (rpcErr) { setError('An error occurred. Please try again.'); return }
     if (data?.error === 'not_found') {
       setError("We couldn't find an account with that email address. Please check your email and try again, or contact your coach.")
       return
@@ -35,7 +34,6 @@ export default function PersonalInsightsLMSPage() {
 
     setPerson(data)
 
-    // Try to load custom DB content; fall back to static data
     const strengths = data.top5?.filter(Boolean) ?? []
     const map = {}
     strengths.forEach(s => { map[s] = { ...PERSONAL_INSIGHTS[s] } })
@@ -55,11 +53,20 @@ export default function PersonalInsightsLMSPage() {
     setInsights(map)
   }
 
+  async function handleLookup(e) {
+    e.preventDefault()
+    if (!email.trim()) return
+    await lookupByEmail(email)
+  }
+
+  useEffect(() => {
+    if (emailParam) lookupByEmail(emailParam)
+  }, [])
+
   const strengths = person?.top5?.filter(Boolean) ?? []
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center">
           <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
@@ -67,8 +74,11 @@ export default function PersonalInsightsLMSPage() {
       </header>
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
-        {!person ? (
-          // ── Email lookup form ──
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <p className="text-gray-400 text-sm">Loading…</p>
+          </div>
+        ) : !person ? (
           <div className="max-w-md mx-auto">
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
               <div className="mb-6">
@@ -82,7 +92,6 @@ export default function PersonalInsightsLMSPage() {
                   Enter the email address your coach has on file to view your CliftonStrengths Personal Insights report.
                 </p>
               </div>
-
               <form onSubmit={handleLookup} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
@@ -106,13 +115,12 @@ export default function PersonalInsightsLMSPage() {
                   disabled={loading || !email.trim()}
                   className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
                 >
-                  {loading ? 'Looking up…' : 'View My Report'}
+                  View My Report
                 </button>
               </form>
             </div>
           </div>
         ) : strengths.length === 0 ? (
-          // ── Found person but no strengths ──
           <div className="max-w-md mx-auto text-center py-16">
             <p className="text-gray-700 font-medium mb-2">Hi, {person.name.split(' ')[0]}!</p>
             <p className="text-sm text-gray-500">
@@ -123,7 +131,6 @@ export default function PersonalInsightsLMSPage() {
             </button>
           </div>
         ) : (
-          // ── Report ──
           <div>
             <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
               <div>
@@ -132,13 +139,13 @@ export default function PersonalInsightsLMSPage() {
               </div>
               <button
                 onClick={() => {
-                const html = buildPersonalInsightsPrintHTML(person.name, strengths)
-                const win = window.open('', '_blank')
-                win.document.write(html)
-                win.document.close()
-                win.focus()
-                setTimeout(() => win.print(), 250)
-              }}
+                  const html = buildPersonalInsightsPrintHTML(person.name, strengths)
+                  const win = window.open('', '_blank')
+                  win.document.write(html)
+                  win.document.close()
+                  win.focus()
+                  setTimeout(() => win.print(), 250)
+                }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium print:hidden"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
