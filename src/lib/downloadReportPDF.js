@@ -114,14 +114,14 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     )
   }
 
-  return doc.output('blob')
+  return doc
 }
 
 export async function downloadPersonalInsightsPDF(person) {
   const strengths = (person.top5 ?? []).filter(s => PERSONAL_INSIGHTS[s])
   const rowLabels = ROWS.map((row, i) => i === 0 ? person.name : row.label)
 
-  const blob = await buildReportPDF(
+  const doc = await buildReportPDF(
     'Personal Insights',
     person.name,
     strengths,
@@ -129,19 +129,14 @@ export async function downloadPersonalInsightsPDF(person) {
     (ri, ci) => PERSONAL_INSIGHTS[strengths[ci]]?.[ROWS[ri].key] ?? '',
   )
 
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = safeName(`${person.name} - Personal Insights.pdf`)
-  a.click()
-  URL.revokeObjectURL(url)
+  doc.save(safeName(`${person.name} - Personal Insights.pdf`))
 }
 
 export async function downloadCustomReportPDF(reportName, person, rows, insights) {
   const strengths = (person.top5 ?? []).filter(Boolean)
   const rowLabels = rows.map(r => r.label)
 
-  const blob = await buildReportPDF(
+  const doc = await buildReportPDF(
     reportName,
     person.name,
     strengths,
@@ -149,10 +144,5 @@ export async function downloadCustomReportPDF(reportName, person, rows, insights
     (ri, ci) => insights?.[strengths[ci]]?.[rows[ri].id] ?? '',
   )
 
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = safeName(`${person.name} - ${reportName}.pdf`)
-  a.click()
-  URL.revokeObjectURL(url)
+  doc.save(safeName(`${person.name} - ${reportName}.pdf`))
 }
