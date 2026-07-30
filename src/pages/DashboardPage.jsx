@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
-import { useAuth } from '../hooks/useAuth'
 import { parseLocalDate, formatDateShort, todayStr } from '../lib/dateUtils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -155,11 +154,9 @@ function MiniCalendar({ sessions }) {
 
 // ── Session Card ──────────────────────────────────────────────────────────────
 
-function SessionCard({ session, user, profiles }) {
+function SessionCard({ session }) {
   const total       = session.participants.length
   const submitted   = session.participants.filter(p => p.responses?.some(r => r.submitted_at)).length
-  const isOwner     = session.created_by === user?.id
-  const sharedBy    = !isOwner ? (profiles[session.created_by] ?? 'Another coach') : null
 
   return (
     <Link
@@ -171,14 +168,6 @@ function SessionCard({ session, user, profiles }) {
           <p className="font-semibold text-gray-900 truncate">{session.title}</p>
           {session.archived && (
             <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">Archived</span>
-          )}
-          {isOwner && session.shared && !session.archived && (
-            <span className="text-xs font-medium bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full shrink-0">Shared</span>
-          )}
-          {!isOwner && (
-            <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full shrink-0">
-              Shared by {sharedBy}
-            </span>
           )}
         </div>
         <p className="text-sm text-gray-500 mt-0.5">
@@ -196,25 +185,17 @@ function SessionCard({ session, user, profiles }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useAuth()
   const [sessions, setSessions]     = useState([])
-  const [profiles, setProfiles]     = useState({})
   const [loading, setLoading]       = useState(true)
   const [pastExpanded, setPastExpanded] = useState(false)
 
   useEffect(() => {
     async function load() {
-      const [{ data: sessData }, { data: profData }] = await Promise.all([
-        supabase
-          .from('sessions')
-          .select(`*, participants ( id, responses ( submitted_at ) )`)
-          .order('date', { ascending: false }),
-        supabase.from('profiles').select('id, display_name'),
-      ])
+      const { data: sessData } = await supabase
+        .from('sessions')
+        .select(`*, participants ( id, responses ( submitted_at ) )`)
+        .order('date', { ascending: false })
       setSessions(sessData ?? [])
-      const map = {}
-      ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
-      setProfiles(map)
       setLoading(false)
     }
     load()
@@ -276,7 +257,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {activeSessions.map(s => (
-                  <SessionCard key={s.id} session={s} user={user} profiles={profiles} />
+                  <SessionCard key={s.id} session={s} />
                 ))}
               </div>
             )}
@@ -304,7 +285,7 @@ export default function DashboardPage() {
                   <div className="bg-white divide-y divide-gray-100">
                     {pastSessions.map(s => (
                       <div key={s.id} className="px-3 py-2">
-                        <SessionCard session={s} user={user} profiles={profiles} />
+                        <SessionCard session={s} />
                       </div>
                     ))}
                   </div>

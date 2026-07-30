@@ -7,7 +7,6 @@ import StrengthBadge from '../components/StrengthBadge'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
 import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
-import { useAuth } from '../hooks/useAuth'
 import { formatDateLong } from '../lib/dateUtils'
 
 // ── Group Access Link card with QR code ───────────────────────────────────────
@@ -82,9 +81,7 @@ function GroupAccessLinkCard({ joinUrl, sessionTitle }) {
 export default function SessionPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useAuth()
   const [session, setSession] = useState(null)
-  const [profiles, setProfiles] = useState({})
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(null)
@@ -128,20 +125,16 @@ export default function SessionPage() {
   }, [id])
 
   async function load() {
-    const [{ data: sess }, { data: parts }, { data: profData }] = await Promise.all([
+    const [{ data: sess }, { data: parts }] = await Promise.all([
       supabase.from('sessions').select('*').eq('id', id).single(),
       supabase
         .from('participants')
         .select('id, name, email, top5, worksheet_url_slug, is_manager, responses(id, submitted_at)')
         .eq('session_id', id)
         .order('name'),
-      supabase.from('profiles').select('id, display_name'),
     ])
     setSession(sess)
     setParticipants(parts ?? [])
-    const map = {}
-    ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
-    setProfiles(map)
     setLoading(false)
   }
 
@@ -262,7 +255,7 @@ export default function SessionPage() {
     if (fromPaste.length > 0) {
       await supabase.from('people').upsert(
         fromPaste.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
-        { onConflict: 'email,created_by' }
+        { onConflict: 'email' }
       )
     }
 
@@ -360,16 +353,6 @@ export default function SessionPage() {
     setBlankProgress(null)
   }
 
-  async function handleToggleShare() {
-    const { data: updated } = await supabase
-      .from('sessions')
-      .update({ shared: !session.shared })
-      .eq('id', id)
-      .select()
-      .single()
-    if (updated) setSession(updated)
-  }
-
   async function handleDownloadAll() {
     setBatchDownloading(true)
     setBatchProgress(null)
@@ -448,11 +431,6 @@ export default function SessionPage() {
 
   if (loading) return <Layout><p className="text-gray-500 text-sm">Loading…</p></Layout>
   if (!session) return <Layout><p className="text-red-500 text-sm">Session not found.</p></Layout>
-
-  const isOwner = session.created_by === user?.id
-  const sharedByName = !isOwner
-    ? (profiles[session.created_by] ?? 'Another coach')
-    : null
 
   const submittedCount = participants.filter(isSubmitted).length
   const visibleParticipants = participants
@@ -603,16 +581,7 @@ export default function SessionPage() {
         <Link to="/" className="text-sm text-gray-400 hover:text-gray-600 transition-colors">← All sessions</Link>
       </div>
 
-      {/* Shared-by banner for non-owners */}
-      {!isOwner && (
-        <div className="mt-3 mb-3 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
-          <span className="text-xs text-gray-500">
-            Shared by <span className="font-medium text-gray-700">{sharedByName}</span> — view only
-          </span>
-        </div>
-      )}
-
-      {/* Row 1 — title + share toggle + counts */}
+      {/* Row 1 — title + counts */}
       <div className="flex items-start justify-between mt-3 mb-3">
         <div>
           {editing ? (
@@ -641,19 +610,6 @@ export default function SessionPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {isOwner && !editing && (
-            <button
-              onClick={handleToggleShare}
-              className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
-                session.shared
-                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                  : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-              }`}
-              title={session.shared ? 'Click to make private' : 'Click to share with other coaches'}
-            >
-              {session.shared ? '🌐 Shared' : '🔒 Private'}
-            </button>
-          )}
           <div className="text-right text-sm text-gray-500">
             <p>{participants.length} participants</p>
             <p className="text-xs mt-0.5">{submittedCount}/{participants.length} submitted</p>
@@ -728,55 +684,53 @@ export default function SessionPage() {
             )}
           </div>
 
-          {/* Owner-only group — Edit + Delete */}
-          {isOwner && (
-            <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
+          {/* Edit + Archive + Delete */}
+          <div className="flex items-center text-xs divide-x divide-gray-200 border border-gray-200 rounded-lg overflow-hidden bg-white">
+            <button
+              onClick={startEditing}
+              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
+            >Edit</button>
+
+            {/* Archive / Unarchive */}
+            {session.archived ? (
               <button
-                onClick={startEditing}
+                onClick={() => handleArchive(false)}
                 className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
-              >Edit</button>
+              >Unarchive</button>
+            ) : confirmArchive ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50">
+                <span className="text-amber-700 font-medium whitespace-nowrap">Archive?</span>
+                <button
+                  onClick={() => handleArchive(true)}
+                  className="font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded transition-colors"
+                >Yes</button>
+                <button onClick={() => setConfirmArchive(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmArchive(true)}
+                className="px-3 py-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+              >Archive</button>
+            )}
 
-              {/* Archive / Unarchive */}
-              {session.archived ? (
+            {/* Delete */}
+            {confirmDelete ? (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50">
+                <span className="text-red-700 font-medium whitespace-nowrap">Delete?</span>
                 <button
-                  onClick={() => handleArchive(false)}
-                  className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors"
-                >Unarchive</button>
-              ) : confirmArchive ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50">
-                  <span className="text-amber-700 font-medium whitespace-nowrap">Archive?</span>
-                  <button
-                    onClick={() => handleArchive(true)}
-                    className="font-semibold text-white bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded transition-colors"
-                  >Yes</button>
-                  <button onClick={() => setConfirmArchive(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmArchive(true)}
-                  className="px-3 py-1.5 text-gray-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
-                >Archive</button>
-              )}
-
-              {/* Delete */}
-              {confirmDelete ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50">
-                  <span className="text-red-700 font-medium whitespace-nowrap">Delete?</span>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
-                  >{deleting ? '…' : 'Yes'}</button>
-                  <button onClick={() => setConfirmDelete(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="px-3 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors"
-                >Delete</button>
-              )}
-            </div>
-          )}
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="font-semibold text-white bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded disabled:opacity-60 transition-colors"
+                >{deleting ? '…' : 'Yes'}</button>
+                <button onClick={() => setConfirmDelete(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="px-3 py-1.5 text-gray-500 hover:bg-red-50 hover:text-red-500 transition-colors"
+              >Delete</button>
+            )}
+          </div>
 
         </div>
       )}
@@ -843,7 +797,7 @@ export default function SessionPage() {
                             Manager
                           </span>
                         )}
-                        {editing && isOwner && (
+                        {editing && (
                           <button
                             onClick={() => handleToggleManager(p.id, p.is_manager)}
                             className={`text-xs font-medium px-1.5 py-0.5 rounded-full border transition-colors ${
@@ -940,8 +894,8 @@ export default function SessionPage() {
         )}
       </div>
 
-      {/* Add participants panel — only in edit mode (owner only) */}
-      {editing && isOwner && (
+      {/* Add participants panel — only in edit mode */}
+      {editing && (
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-gray-900">

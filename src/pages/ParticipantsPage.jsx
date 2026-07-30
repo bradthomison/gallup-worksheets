@@ -5,7 +5,6 @@ import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
-import { useAuth } from '../hooks/useAuth'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
@@ -97,7 +96,7 @@ function AddTeamModal({ onSave, onClose }) {
 }
 
 // ── Edit / Add row ────────────────────────────────────────────────────────────
-function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, isOwner, shared, onToggleShare, onDeletePerson }) {
+function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, onDeletePerson }) {
   const [form, setForm] = useState({
     name: person.name,
     email: person.email,
@@ -206,30 +205,15 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, isOwner, shar
               Cancel
             </button>
           </div>
-          {/* Row 2: Shared toggle + Delete */}
-          {(isOwner && (onToggleShare || onDeletePerson)) && (
+          {/* Row 2: Delete */}
+          {onDeletePerson && (
             <div className="flex gap-2">
-              {isOwner && onToggleShare && (
-                <button
-                  onClick={onToggleShare}
-                  className={`text-xs font-medium px-3 py-1 rounded-full border transition-colors whitespace-nowrap ${
-                    shared
-                      ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100'
-                      : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
-                  }`}
-                  title={shared ? 'Click to make private' : 'Click to share with other coaches'}
-                >
-                  {shared ? 'Shared' : 'Private'}
-                </button>
-              )}
-              {isOwner && onDeletePerson && (
-                <button
-                  onClick={onDeletePerson}
-                  className="text-xs font-medium px-3 py-1 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
-                >
-                  Delete
-                </button>
-              )}
+              <button
+                onClick={onDeletePerson}
+                className="text-xs font-medium px-3 py-1 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors whitespace-nowrap"
+              >
+                Delete
+              </button>
             </div>
           )}
         </div>
@@ -574,11 +558,9 @@ function PersonWorksheetPanel({ person, onClose }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function ParticipantsPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const [people, setPeople] = useState([])
   const [teams, setTeams] = useState([])
-  const [profiles, setProfiles] = useState({})
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null)
   const [addingNew, setAddingNew] = useState(false)
@@ -601,15 +583,11 @@ export default function ParticipantsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data }, { data: profData }, { data: teamsData }] = await Promise.all([
+    const [{ data }, { data: teamsData }] = await Promise.all([
       supabase.from('people').select('*').order('name'),
-      supabase.from('profiles').select('id, display_name'),
       supabase.from('teams').select('*').order('name'),
     ])
     setPeople(data ?? [])
-    const map = {}
-    ;(profData ?? []).forEach(p => { map[p.id] = p.display_name })
-    setProfiles(map)
     setTeams(teamsData ?? [])
     setLoading(false)
   }
@@ -639,11 +617,6 @@ export default function ParticipantsPage() {
     load()
   }
 
-  async function handleToggleShare(person) {
-    await supabase.from('people').update({ shared: !person.shared }).eq('id', person.id)
-    setPeople(prev => prev.map(p => p.id === person.id ? { ...p, shared: !p.shared } : p))
-  }
-
   async function handlePasteSave() {
     const { parsed, errors } = parseParticipants(pasteText)
     if (errors.length > 0) return
@@ -653,7 +626,7 @@ export default function ParticipantsPage() {
     const { data: { user: u } } = await supabase.auth.getUser()
     const { error } = await supabase.from('people').upsert(
       parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: u.id, team_id: pasteTeamId || null })),
-      { onConflict: 'email,created_by' }
+      { onConflict: 'email' }
     )
     setPasteSaving(false)
     if (error) { setSaveError(error.message); return }
@@ -868,10 +841,6 @@ export default function ParticipantsPage() {
                 </tr>
               )}
               {filtered.map(p => {
-                const isOwner = p.created_by === user?.id
-                const sharedByName = !isOwner
-                  ? (profiles[p.created_by] ?? 'Another coach')
-                  : null
                 const team = p.team_id ? teamMap[p.team_id] : null
                 return editingId === p.id ? (
                   <EditRow
@@ -881,9 +850,6 @@ export default function ParticipantsPage() {
                     onSave={data => handleSaveEdit(p.id, data)}
                     onCancel={() => setEditingId(null)}
                     onOpenAddTeam={openAddTeamModal}
-                    isOwner={isOwner}
-                    shared={p.shared}
-                    onToggleShare={() => handleToggleShare(p)}
                     onDeletePerson={() => { setDeleteConfirm(p.id); setEditingId(null) }}
                   />
                 ) : (
@@ -891,11 +857,6 @@ export default function ParticipantsPage() {
                     <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{p.name}</p>
-                        {!isOwner && (
-                          <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full mt-0.5 inline-block">
-                            Shared by {sharedByName}
-                          </span>
-                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{p.email}</td>
                       <td className="px-4 py-3">
@@ -914,16 +875,14 @@ export default function ParticipantsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1.5">
-                          {isOwner && (
-                            <div>
-                              <button
-                                onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
-                                className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
-                              >
-                                Edit Person
-                              </button>
-                            </div>
-                          )}
+                          <div>
+                            <button
+                              onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null) }}
+                              className="text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Edit Person
+                            </button>
+                          </div>
                           <div className="flex items-center gap-1.5">
                             {(p.top5 ?? []).some(Boolean) && (
                               <button
@@ -933,14 +892,12 @@ export default function ParticipantsPage() {
                                 Personal Insights
                               </button>
                             )}
-                            {(isOwner || p.shared) && (
-                              <button
-                                onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
-                                className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
-                              >
-                                Worksheets {expandedPersonId === p.id ? '↑' : '›'}
-                              </button>
-                            )}
+                            <button
+                              onClick={() => setExpandedPersonId(id => id === p.id ? null : p.id)}
+                              className="text-xs font-medium text-brand-500 hover:text-brand-700 border border-brand-200 bg-brand-50 hover:bg-brand-100 px-3 py-1 rounded-lg transition-colors"
+                            >
+                              Worksheets {expandedPersonId === p.id ? '↑' : '›'}
+                            </button>
                           </div>
                         </div>
                       </td>
