@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { getStrengthColors } from '../lib/strengthColors'
 import { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
+import { downloadPersonalInsightsPDF } from '../lib/downloadReportPDF'
 import SiteFooter from '../components/SiteFooter'
 
 export default function PersonalInsightsLMSPage() {
@@ -15,6 +16,7 @@ export default function PersonalInsightsLMSPage() {
   const [person, setPerson] = useState(null)
   const [insights, setInsights] = useState(null)
   const [error, setError] = useState(null)
+  const [pdfLoading, setPdfLoading] = useState(false)
 
   async function lookupByEmail(emailVal) {
     setLoading(true)
@@ -137,22 +139,38 @@ export default function PersonalInsightsLMSPage() {
                 <h1 className="text-2xl font-bold text-gray-900">Personal Insights</h1>
                 <p className="text-gray-500 text-sm mt-0.5">{person.name}</p>
               </div>
-              <button
-                onClick={() => {
-                  const html = buildPersonalInsightsPrintHTML(person.name, strengths)
-                  const win = window.open('', '_blank')
-                  win.document.write(html)
-                  win.document.close()
-                  win.focus()
-                  setTimeout(() => win.print(), 250)
-                }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium print:hidden"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print / PDF
-              </button>
+              <div className="flex items-center gap-2 print:hidden">
+                <button
+                  onClick={async () => {
+                    setPdfLoading(true)
+                    await downloadPersonalInsightsPDF({ ...person, top5: strengths })
+                    setPdfLoading(false)
+                  }}
+                  disabled={pdfLoading}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  {pdfLoading ? 'Generating…' : 'Download PDF'}
+                </button>
+                <button
+                  onClick={() => {
+                    const html = buildPersonalInsightsPrintHTML(person.name, strengths)
+                    const win = window.open('', '_blank')
+                    win.document.write(html)
+                    win.document.close()
+                    win.focus()
+                    setTimeout(() => win.print(), 250)
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print
+                </button>
+              </div>
             </div>
 
             <div className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-4"
