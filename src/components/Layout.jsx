@@ -85,7 +85,14 @@ export default function Layout({ children }) {
                     onClick={() => setMoreOpen(false)}
                     className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                   >
-                    Themes and Reports
+                    Themes
+                  </Link>
+                  <Link
+                    to="/reports"
+                    onClick={() => setMoreOpen(false)}
+                    className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  >
+                    Reports
                   </Link>
                   <Link
                     to="/lms-learners"

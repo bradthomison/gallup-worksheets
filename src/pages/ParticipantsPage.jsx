@@ -298,7 +298,7 @@ function CustomReportModal({ report, participant, onClose }) {
           ) : rows.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">This report has no rows defined yet.</p>
-              <p className="text-sm text-gray-400 mt-1">Go to Themes and Reports to add rows.</p>
+              <p className="text-sm text-gray-400 mt-1">Go to Reports to add rows.</p>
             </div>
           ) : strengths.length === 0 ? (
             <div className="text-center py-12">
@@ -372,7 +372,7 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
             >Open</button>
           </div>
           {reports.length === 0 && (
-            <p className="text-xs text-gray-400 pt-1">No custom reports yet. Create one on the Themes and Reports page.</p>
+            <p className="text-xs text-gray-400 pt-1">No custom reports yet. Create one on the Reports page.</p>
           )}
           {reports.map(report => (
             <div key={report.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
