@@ -74,7 +74,7 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     fontStyle: 'bold',
     fillColor: [248, 249, 250],
     textColor: [50, 50, 50],
-    fontSize: 8,
+    fontSize: 10,
     overflow: 'linebreak',
   })
 
@@ -87,8 +87,8 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     startY,
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
-    styles: { fontSize: 8, cellPadding: 5, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 6 },
+    styles: { fontSize: 10, cellPadding: 5, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 11, halign: 'center', cellPadding: 6 },
     columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [252, 252, 253] },
@@ -192,10 +192,10 @@ export async function downloadBringNeedPDF(person) {
     startY,
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
-    styles: { fontSize: 8.5, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9, halign: 'center', cellPadding: 6 },
+    styles: { fontSize: 10.5, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 11, halign: 'center', cellPadding: 6 },
     columnStyles: {
-      0: { cellWidth: themeColWidth, fontStyle: 'bold', fontSize: 9 },
+      0: { cellWidth: themeColWidth, fontStyle: 'bold', fontSize: 11 },
       1: { cellWidth: textColWidth },
       2: { cellWidth: textColWidth },
     },

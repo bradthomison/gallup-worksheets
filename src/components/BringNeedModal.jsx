@@ -12,9 +12,9 @@ export function buildBringNeedPrintHTML(name, strengths) {
 
   const bodyRows = rows.map(s => {
     const c = getStrengthColors(s)
-    const labelCell = `<th style="width:110px;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:6px 5px;font-size:11px;font-weight:700;text-align:left;vertical-align:top;">${s}</th>`
-    const bringCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:10px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.bring ?? '').replace(/\n/g, '<br/>')}</td>`
-    const needCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:10px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.need ?? '').replace(/\n/g, '<br/>')}</td>`
+    const labelCell = `<th style="width:110px;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:6px 5px;font-size:13px;font-weight:700;text-align:left;vertical-align:top;">${s}</th>`
+    const bringCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:12px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.bring ?? '').replace(/\n/g, '<br/>')}</td>`
+    const needCell = `<td style="border:1px solid #d1d5db;padding:6px 5px;font-size:12px;vertical-align:top;white-space:pre-line;">${(BRING_NEED[s]?.need ?? '').replace(/\n/g, '<br/>')}</td>`
     return `<tr>${labelCell}${bringCell}${needCell}</tr>`
   }).join('')
 
@@ -23,7 +23,7 @@ export function buildBringNeedPrintHTML(name, strengths) {
 *{box-sizing:border-box;}
 html,body{height:100%;margin:0;padding:0;}
 body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}
-h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+h2{font-size:16px;margin:0 0 6px 0;color:#111;flex-shrink:0;}
 table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
 th,td{word-wrap:break-word;overflow-wrap:break-word;}
 tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}
@@ -37,8 +37,8 @@ print-color-adjust:exact;
 <colgroup><col style="width:110px;"/><col/><col/></colgroup>
 <thead><tr>
 <th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></th>
-<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Bring<br/><span style="font-weight:400;font-size:9px;">This is what I can contribute (The value I add)</span></th>
-<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:11px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Need<br/><span style="font-weight:400;font-size:9px;">This is what I need (My Energizers)</span></th>
+<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Bring<br/><span style="font-weight:400;font-size:11px;">This is what I can contribute (The value I add)</span></th>
+<th style="border:1px solid #d1d5db;background:#f3f4f6;padding:6px 5px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">I Need<br/><span style="font-weight:400;font-size:11px;">This is what I need (My Energizers)</span></th>
 </tr></thead>
 <tbody>${bodyRows}</tbody>
 <tfoot><tr><td colspan="3">Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.</td></tr></tfoot>

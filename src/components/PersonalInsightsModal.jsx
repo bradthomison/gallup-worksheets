@@ -11,17 +11,17 @@ export function buildPersonalInsightsPrintHTML(name, strengths) {
 
   const headerCells = cols.map(s => {
     const c = getStrengthColors(s)
-    return `<th style="background:${c.headerBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;color:${c.headerText};padding:6px 5px;font-size:12px;font-weight:700;text-align:center;border:1px solid #d1d5db;">${s}</th>`
+    return `<th style="background:${c.headerBg};-webkit-print-color-adjust:exact;print-color-adjust:exact;color:${c.headerText};padding:6px 5px;font-size:14px;font-weight:700;text-align:center;border:1px solid #d1d5db;">${s}</th>`
   }).join('')
 
   const bodyRows = ROWS.map(row => {
     const labelCell = row.key === 'description'
-      ? `<th style="padding:6px 5px;font-size:11px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #d1d5db;min-width:120px;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${name}</th>`
-      : `<th style="padding:6px 5px;font-size:11px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #d1d5db;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>`
+      ? `<th style="padding:6px 5px;font-size:13px;font-weight:700;text-align:left;vertical-align:top;border:1px solid #d1d5db;min-width:120px;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${name}</th>`
+      : `<th style="padding:6px 5px;font-size:13px;font-weight:600;text-align:left;vertical-align:top;border:1px solid #d1d5db;background:#f9fafb;-webkit-print-color-adjust:exact;print-color-adjust:exact;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>`
 
     const cells = cols.map(s => {
       const text = PERSONAL_INSIGHTS[s]?.[row.key] ?? ''
-      return `<td style="padding:6px 5px;font-size:10.5px;vertical-align:top;border:1px solid #d1d5db;">${text}</td>`
+      return `<td style="padding:6px 5px;font-size:13px;vertical-align:top;border:1px solid #d1d5db;">${text}</td>`
     }).join('')
 
     return `<tr>${labelCell}${cells}</tr>`
@@ -32,7 +32,7 @@ export function buildPersonalInsightsPrintHTML(name, strengths) {
 *{box-sizing:border-box;}
 html,body{height:100%;margin:0;padding:0;}
 body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}
-h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+h2{font-size:16px;margin:0 0 6px 0;color:#111;flex-shrink:0;}
 table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
 th,td{word-wrap:break-word;overflow-wrap:break-word;}
 tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}

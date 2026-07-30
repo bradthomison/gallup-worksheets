@@ -10,15 +10,15 @@ function buildReportPrintHTML(reportName, personName, strengths, rows, insights)
 
   const headerCells = strengths.map(s => {
     const c = getStrengthColors(s)
-    return `<th style="width:${colWidth}%;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};padding:4px 5px;font-size:9px;font-weight:700;text-align:center;">${s}</th>`
+    return `<th style="width:${colWidth}%;border:1px solid #d1d5db;background:${c.headerBg};color:${c.headerText};padding:5px 6px;font-size:12px;font-weight:700;text-align:center;">${s}</th>`
   }).join('')
 
   const bodyRows = rows.map(row => {
     const cells = strengths.map(s => {
       const val = insights?.[s]?.[row.id] ?? ''
-      return `<td style="border:1px solid #d1d5db;padding:3px 5px;font-size:8px;color:#374151;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${val}</td>`
+      return `<td style="border:1px solid #d1d5db;padding:4px 6px;font-size:11px;color:#374151;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${val}</td>`
     }).join('')
-    return `<tr><th style="width:145px;border:1px solid #d1d5db;background:#f9fafb;padding:3px 5px;font-size:8px;font-weight:600;color:#374151;text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>${cells}</tr>`
+    return `<tr><th style="width:145px;border:1px solid #d1d5db;background:#f9fafb;padding:4px 6px;font-size:11px;font-weight:600;color:#374151;text-align:left;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;">${row.label}</th>${cells}</tr>`
   }).join('')
 
   return `<!DOCTYPE html><html><head><title>${reportName} — ${personName}</title>
@@ -26,7 +26,7 @@ function buildReportPrintHTML(reportName, personName, strengths, rows, insights)
 *{box-sizing:border-box;}
 html,body{height:100%;margin:0;padding:0;}
 body{font-family:Arial,sans-serif;display:flex;flex-direction:column;}
-h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+h2{font-size:16px;margin:0 0 6px 0;color:#111;flex-shrink:0;}
 table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
 th,td{word-wrap:break-word;overflow-wrap:break-word;}
 tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}

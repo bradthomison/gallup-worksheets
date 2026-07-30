@@ -181,8 +181,8 @@ async function buildWorksheetPDF(participant, session, responses, blank = false)
     startY,
     tableWidth: usableWidth,  // lock exact table width in both modes
     margin: { left: 20, right: 20 },
-    styles: { fontSize: 9, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 10, halign: 'center', cellPadding: 8 },
+    styles: { fontSize: 11, cellPadding: 6, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 12, halign: 'center', cellPadding: 8 },
     columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: blank ? [255, 255, 255] : [252, 252, 253] },
