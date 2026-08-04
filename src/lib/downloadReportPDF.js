@@ -78,31 +78,42 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   const innerW = equalColWidth - 2 * cellPadding
 
   // ── Single-page fit + fill ─────────────────────────────────────────────────
-  // Divide available vertical space evenly so rows fill the page.
   const footerReserved = 30
-  const headRowH = 28   // estimated header row height
-  const numRows = rowLabels.length
   const availableH = pageHeight - startY - footerReserved
-  const minCellH = Math.max(20, (availableH - headRowH) / numRows)
+  const numRows = rowLabels.length
 
-  // Find the largest font size (max 11) where every body cell fits in minCellH.
   const tableBody = rowLabels.map((label, ri) => [
     label,
     ...strengths.map((_, ci) => getCell(ri, ci)),
   ])
 
-  let fontSize = 11
-  for (let fs = 11; fs >= 7; fs--) {
+  // Phase 1: find largest font size (max 14) where every body row fits in its
+  // share of the available height. Use a conservative head row estimate (32pt)
+  // so the search phase doesn't require knowing fontSize first.
+  const searchHeadRowH = 32
+  const searchMinCellH = Math.max(20, (availableH - searchHeadRowH) / numRows)
+
+  let fontSize = 12
+  for (let fs = 12; fs >= 7; fs--) {
     doc.setFontSize(fs)
     doc.setFont('helvetica', 'normal')
     const lh = fs * doc.getLineHeightFactor()
     const fits = tableBody.every(row => {
       const maxLines = Math.max(...row.map(cell => countLines(doc, cell, innerW)))
-      return maxLines * lh + 2 * cellPadding <= minCellH
+      return maxLines * lh + 2 * cellPadding <= searchMinCellH
     })
     if (fits) { fontSize = fs; break }
     if (fs === 7) fontSize = 7
   }
+
+  // Phase 2: now that fontSize is known, compute exact minCellH with accurate
+  // head row height so rows fill the page precisely.
+  const headFontSize = fontSize + 2
+  doc.setFontSize(headFontSize)
+  const headRowH = headFontSize * doc.getLineHeightFactor() + 12  // 6pt padding each side
+  const minCellH = Math.max(20, (availableH - headRowH) / numRows)
+
+  const col0FontSize = Math.min(fontSize + 2, 16)
 
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
 
@@ -114,7 +125,7 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     fontStyle: 'bold',
     fillColor: [248, 249, 250],
     textColor: [50, 50, 50],
-    fontSize,
+    fontSize: col0FontSize,
     overflow: 'linebreak',
   })
 
@@ -125,7 +136,7 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
     styles: { fontSize, cellPadding, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fontSize + 1, halign: 'center', cellPadding: 6 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: headFontSize, halign: 'center', cellPadding: 6 },
     columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [252, 252, 253] },
@@ -134,8 +145,6 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
         data.cell.styles.fillColor = headerColors[data.column.index - 1] ?? [59, 91, 219]
         data.cell.styles.textColor = [255, 255, 255]
       }
-    },
-    willDrawCell(data) {
       if (data.section === 'body') {
         data.cell.styles.minCellHeight = minCellH
       }
@@ -232,29 +241,38 @@ export async function downloadBringNeedPDF(person) {
   const cellPadding = 6
   const innerTextW = textColWidth - 2 * cellPadding
   const footerReserved = 30
-  const headRowH = 30
-  const numRows = strengths.length
   const availableH = pageHeight - startY - footerReserved
-  const minCellH = Math.max(24, (availableH - headRowH) / numRows)
+  const numRows = strengths.length
 
   const tableBody = strengths.map(s => [s, BRING_NEED[s]?.bring ?? '', BRING_NEED[s]?.need ?? ''])
 
-  let fontSize = 11
-  for (let fs = 11; fs >= 7; fs--) {
+  // Phase 1: find largest font size (max 12) using conservative head height.
+  const searchHeadRowH = 32
+  const searchMinCellH = Math.max(24, (availableH - searchHeadRowH) / numRows)
+
+  let fontSize = 12
+  for (let fs = 12; fs >= 7; fs--) {
     doc.setFontSize(fs)
     doc.setFont('helvetica', 'normal')
     const lh = fs * doc.getLineHeightFactor()
     const fits = tableBody.every(row => {
-      // columns 1 and 2 are the wide text columns; column 0 (theme name) always fits
       const maxLines = Math.max(
         countLines(doc, row[1], innerTextW),
         countLines(doc, row[2], innerTextW),
       )
-      return maxLines * lh + 2 * cellPadding <= minCellH
+      return maxLines * lh + 2 * cellPadding <= searchMinCellH
     })
     if (fits) { fontSize = fs; break }
     if (fs === 7) fontSize = 7
   }
+
+  // Phase 2: accurate minCellH now that fontSize is known.
+  const headFontSize = fontSize + 2
+  doc.setFontSize(headFontSize)
+  const headRowH = headFontSize * doc.getLineHeightFactor() + 12
+  const minCellH = Math.max(24, (availableH - headRowH) / numRows)
+
+  const col0FontSize = Math.min(fontSize + 2, 14)
 
   autoTable(doc, {
     head: [['Theme', 'I Bring', 'I Need']],
@@ -263,9 +281,9 @@ export async function downloadBringNeedPDF(person) {
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
     styles: { fontSize, cellPadding, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fontSize + 1, halign: 'center', cellPadding: 6 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: headFontSize, halign: 'center', cellPadding: 6 },
     columnStyles: {
-      0: { cellWidth: themeColWidth, fontStyle: 'bold', fontSize: fontSize + 1 },
+      0: { cellWidth: themeColWidth, fontStyle: 'bold', fontSize: col0FontSize },
       1: { cellWidth: textColWidth },
       2: { cellWidth: textColWidth },
     },
@@ -275,8 +293,6 @@ export async function downloadBringNeedPDF(person) {
         data.cell.styles.fillColor = headerColors[data.row.index] ?? [59, 91, 219]
         data.cell.styles.textColor = [255, 255, 255]
       }
-    },
-    willDrawCell(data) {
       if (data.section === 'body') {
         data.cell.styles.minCellHeight = minCellH
       }
