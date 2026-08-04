@@ -72,7 +72,7 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   const usableWidth = pageWidth - 40
   const totalCols = strengths.length + 1
   const equalColWidth = usableWidth / totalCols
-  const cellPadding = 5
+  const cellPadding = 4
   const innerW = equalColWidth - 2 * cellPadding
 
   // ── Single-page fit + fill ─────────────────────────────────────────────────
@@ -85,32 +85,52 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     ...strengths.map((_, ci) => getCell(ri, ci)),
   ])
 
-  // Col 0 is bold labels (short text, may wrap) — fixed at 13pt.
-  // Only check content columns (1+) for the font size fit loop.
-  const col0FontSize = 13
+  // Head row at 14pt, 5pt padding each side
+  const headFontSize = 14
+  doc.setFontSize(headFontSize)
+  const headRowH = headFontSize * doc.getLineHeightFactor() + 10
+  const maxBodyH = availableH - headRowH
 
-  const searchHeadRowH = 32
-  const searchMinCellH = Math.max(20, (availableH - searchHeadRowH) / numRows)
+  // Col 0: 12pt bold, wraps freely — compute how tall each label is
+  const col0FS = 12
+  doc.setFontSize(col0FS)
+  doc.setFont('helvetica', 'bold')
+  const col0LH = col0FS * doc.getLineHeightFactor()
+  const col0Heights = tableBody.map(row =>
+    countLines(doc, row[0], innerW) * col0LH + 2 * cellPadding
+  )
 
-  let fontSize = 12
-  for (let fs = 12; fs >= 7; fs--) {
+  // Per-row font sizes for content columns: start at 12pt and reduce only the
+  // tallest rows until the total body height fits on one page. This keeps most
+  // rows at 12pt (readable) while shrinking only content-dense rows as needed.
+  const rowFontSizes = new Array(numRows).fill(12)
+
+  function rowContentH(ri, fs) {
     doc.setFontSize(fs)
     doc.setFont('helvetica', 'normal')
     const lh = fs * doc.getLineHeightFactor()
-    const fits = tableBody.every(row => {
-      // skip col 0 — it wraps freely at its fixed font size
-      const maxLines = Math.max(...row.slice(1).map(cell => countLines(doc, cell, innerW)))
-      return maxLines * lh + 2 * cellPadding <= searchMinCellH
-    })
-    if (fits) { fontSize = fs; break }
-    if (fs === 7) fontSize = 7
+    const cells = tableBody[ri].slice(1)
+    const maxLines = cells.some(c => c) ? Math.max(1, ...cells.map(c => countLines(doc, c, innerW))) : 1
+    return Math.max(col0Heights[ri], maxLines * lh + 2 * cellPadding)
   }
 
-  // Recompute minCellH with the actual head row height now that fontSize is known.
-  const headFontSize = fontSize + 2
-  doc.setFontSize(headFontSize)
-  const headRowH = headFontSize * doc.getLineHeightFactor() + 12
-  const minCellH = Math.max(20, (availableH - headRowH) / numRows)
+  let rowNeededH = rowFontSizes.map((fs, ri) => rowContentH(ri, fs))
+
+  for (let iter = 0; iter < 80; iter++) {
+    if (rowNeededH.reduce((s, h) => s + h, 0) <= maxBodyH) break
+    let worstRI = -1, worstH = 0
+    for (let ri = 0; ri < numRows; ri++) {
+      if (rowFontSizes[ri] > 7 && rowNeededH[ri] > worstH) { worstRI = ri; worstH = rowNeededH[ri] }
+    }
+    if (worstRI === -1) break
+    rowFontSizes[worstRI]--
+    rowNeededH[worstRI] = rowContentH(worstRI, rowFontSizes[worstRI])
+  }
+
+  // Distribute any leftover vertical space evenly to fill the page
+  const totalNeededH = rowNeededH.reduce((s, h) => s + h, 0)
+  const extraPerRow = Math.max(0, maxBodyH - totalNeededH) / numRows
+  const rowMinHeights = rowNeededH.map(h => h + extraPerRow)
 
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
 
@@ -122,7 +142,7 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     fontStyle: 'bold',
     fillColor: [248, 249, 250],
     textColor: [50, 50, 50],
-    fontSize: col0FontSize,
+    fontSize: col0FS,
     overflow: 'linebreak',
   })
 
@@ -132,8 +152,8 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     startY,
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
-    styles: { fontSize, cellPadding, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: headFontSize, halign: 'center', cellPadding: 6 },
+    styles: { fontSize: 12, cellPadding, valign: 'top', overflow: 'linebreak', lineColor: [220, 220, 220], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: headFontSize, halign: 'center', cellPadding: 5 },
     columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [252, 252, 253] },
@@ -143,7 +163,10 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
         data.cell.styles.textColor = [255, 255, 255]
       }
       if (data.section === 'body') {
-        data.cell.styles.minCellHeight = minCellH
+        data.cell.styles.minCellHeight = rowMinHeights[data.row.index]
+        if (data.column.index > 0) {
+          data.cell.styles.fontSize = rowFontSizes[data.row.index]
+        }
       }
     },
   })
