@@ -255,7 +255,7 @@ export default function SessionPage() {
     if (fromPaste.length > 0) {
       await supabase.from('people').upsert(
         fromPaste.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
-        { onConflict: 'email' }
+        { onConflict: 'email,created_by' }
       )
     }
 

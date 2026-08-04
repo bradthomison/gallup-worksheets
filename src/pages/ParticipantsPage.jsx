@@ -924,7 +924,7 @@ export default function ParticipantsPage() {
     const { data: { user: u } } = await supabase.auth.getUser()
     const { error } = await supabase.from('people').upsert(
       parsed.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: u.id, team_id: pasteTeamId || null })),
-      { onConflict: 'email' }
+      { onConflict: 'email,created_by' }
     )
     setPasteSaving(false)
     if (error) { setSaveError(error.message); return }
