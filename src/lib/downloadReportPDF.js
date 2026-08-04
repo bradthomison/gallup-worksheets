@@ -70,10 +70,10 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   // Table starts just below the divider — no extra title block needed
   const startY = headerBottom + 8
   const usableWidth = pageWidth - 40
-  const totalCols = strengths.length + 1
-  const equalColWidth = usableWidth / totalCols
+  const col0Width = 118  // narrower fixed label column, matches benchmark proportion
+  const contentColWidth = (usableWidth - col0Width) / strengths.length
   const cellPadding = 4
-  const innerW = equalColWidth - 2 * cellPadding
+  const innerW = contentColWidth - 2 * cellPadding  // used for content-column text measurement
 
   // ── Single-page fit + fill ─────────────────────────────────────────────────
   const footerReserved = 30
@@ -96,8 +96,9 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   doc.setFontSize(col0FS)
   doc.setFont('helvetica', 'bold')
   const col0LH = col0FS * doc.getLineHeightFactor()
+  const col0InnerW = col0Width - 2 * cellPadding
   const col0Heights = tableBody.map(row =>
-    countLines(doc, row[0], innerW) * col0LH + 2 * cellPadding
+    countLines(doc, row[0], col0InnerW) * col0LH + 2 * cellPadding
   )
 
   // Per-row font sizes for content columns: start at 12pt and reduce only the
@@ -134,9 +135,9 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
 
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
 
-  const columnStyles = {}
-  for (let i = 0; i < totalCols; i++) {
-    columnStyles[i] = { cellWidth: equalColWidth }
+  const columnStyles = { 0: { cellWidth: col0Width } }
+  for (let i = 1; i <= strengths.length; i++) {
+    columnStyles[i] = { cellWidth: contentColWidth }
   }
   Object.assign(columnStyles[0], {
     fontStyle: 'bold',
