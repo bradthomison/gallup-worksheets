@@ -47,30 +47,28 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
 
-  // Header with logo
+  // ── Header: logo left, "Report for Name" right ───────────────────────────
   let headerBottom = 20
   const logo = await loadLogoDataUrl()
+  const logoH = 44
   if (logo) {
-    const logoH = 44
     const logoW = (logo.width / logo.height) * logoH
     doc.addImage(logo.dataUrl, 'PNG', 20, 12, logoW, logoH)
     headerBottom = 12 + logoH + 6
   }
 
+  // Title lives in the header bar — baseline vertically centered with the logo
+  const titleY = 12 + logoH / 2 + 6
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text(`${reportName} for ${personName}`, pageWidth - 20, titleY, { align: 'right' })
+
   doc.setDrawColor(220, 220, 220)
   doc.line(20, headerBottom, pageWidth - 20, headerBottom)
 
-  const infoY = headerBottom + 13
-  doc.setFontSize(12)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(30, 30, 30)
-  doc.text(reportName, 20, infoY)
-  doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(80, 80, 80)
-  doc.text(personName, 20, infoY + 13)
-
-  const startY = infoY + 26
+  // Table starts just below the divider — no extra title block needed
+  const startY = headerBottom + 8
   const usableWidth = pageWidth - 40
   const totalCols = strengths.length + 1
   const equalColWidth = usableWidth / totalCols
@@ -87,9 +85,10 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     ...strengths.map((_, ci) => getCell(ri, ci)),
   ])
 
-  // Phase 1: find largest font size (max 14) where every body row fits in its
-  // share of the available height. Use a conservative head row estimate (32pt)
-  // so the search phase doesn't require knowing fontSize first.
+  // Col 0 is bold labels (short text, may wrap) — fixed at 13pt.
+  // Only check content columns (1+) for the font size fit loop.
+  const col0FontSize = 13
+
   const searchHeadRowH = 32
   const searchMinCellH = Math.max(20, (availableH - searchHeadRowH) / numRows)
 
@@ -99,21 +98,19 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
     doc.setFont('helvetica', 'normal')
     const lh = fs * doc.getLineHeightFactor()
     const fits = tableBody.every(row => {
-      const maxLines = Math.max(...row.map(cell => countLines(doc, cell, innerW)))
+      // skip col 0 — it wraps freely at its fixed font size
+      const maxLines = Math.max(...row.slice(1).map(cell => countLines(doc, cell, innerW)))
       return maxLines * lh + 2 * cellPadding <= searchMinCellH
     })
     if (fits) { fontSize = fs; break }
     if (fs === 7) fontSize = 7
   }
 
-  // Phase 2: now that fontSize is known, compute exact minCellH with accurate
-  // head row height so rows fill the page precisely.
+  // Recompute minCellH with the actual head row height now that fontSize is known.
   const headFontSize = fontSize + 2
   doc.setFontSize(headFontSize)
-  const headRowH = headFontSize * doc.getLineHeightFactor() + 12  // 6pt padding each side
+  const headRowH = headFontSize * doc.getLineHeightFactor() + 12
   const minCellH = Math.max(20, (availableH - headRowH) / numRows)
-
-  const col0FontSize = Math.min(fontSize + 2, 16)
 
   const headerColors = strengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
 
@@ -210,27 +207,23 @@ export async function downloadBringNeedPDF(person) {
 
   let headerBottom = 20
   const logo = await loadLogoDataUrl()
+  const logoH = 40
   if (logo) {
-    const logoH = 40
     const logoW = (logo.width / logo.height) * logoH
     doc.addImage(logo.dataUrl, 'PNG', 20, 12, logoW, logoH)
     headerBottom = 12 + logoH + 6
   }
 
+  const titleY = 12 + logoH / 2 + 6
+  doc.setFontSize(15)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text(`Bring - Need for ${person.name}`, pageWidth - 20, titleY, { align: 'right' })
+
   doc.setDrawColor(220, 220, 220)
   doc.line(20, headerBottom, pageWidth - 20, headerBottom)
 
-  const infoY = headerBottom + 15
-  doc.setFontSize(13)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(30, 30, 30)
-  doc.text('Bring - Need', 20, infoY)
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(80, 80, 80)
-  doc.text(person.name, 20, infoY + 14)
-
-  const startY = infoY + 26
+  const startY = headerBottom + 8
   const usableWidth = pageWidth - 40
   const themeColWidth = 90
   const textColWidth = (usableWidth - themeColWidth) / 2
