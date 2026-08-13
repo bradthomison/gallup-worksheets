@@ -1017,35 +1017,19 @@ export default function ParticipantsPage() {
       )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex gap-2">
-            <button
-              onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
-              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              + Paste Multiple
-            </button>
-            <button
-              onClick={() => { setAddingNew(true); setAddMode('single'); setEditingId(null) }}
-              className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              + Add Person
-            </button>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setBulkInsightsModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              Personal Insights Reports
-            </button>
-            <button
-              onClick={() => setBulkBringNeedModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              Bring - Need Reports
-            </button>
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
+            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + Paste Multiple
+          </button>
+          <button
+            onClick={() => { setAddingNew(true); setAddMode('single'); setEditingId(null) }}
+            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add Person
+          </button>
         </div>
       </div>
 
@@ -1074,6 +1058,18 @@ export default function ParticipantsPage() {
               <span className="text-sm text-gray-700 font-medium">
                 {selectedIds.size} participant{selectedIds.size !== 1 ? 's' : ''} selected
               </span>
+              <button
+                onClick={() => setBulkInsightsModal(true)}
+                className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-300 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Personal Insights Reports
+              </button>
+              <button
+                onClick={() => setBulkBringNeedModal(true)}
+                className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-300 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Bring - Need Reports
+              </button>
               <button
                 onClick={() => setBulkDeleteConfirm(true)}
                 className="text-sm font-semibold text-red-600 hover:text-red-800 border border-red-300 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
