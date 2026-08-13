@@ -88,6 +88,87 @@ function AddMembersModal({ available, onConfirm, onClose }) {
   )
 }
 
+// ── Delete Teams modal ────────────────────────────────────────────────────────
+function DeleteTeamsModal({ teams, people, onDeleteTeam, onClose }) {
+  const [confirming, setConfirming] = useState(null)
+  const [alsoDeleteMembers, setAlsoDeleteMembers] = useState(false)
+
+  const memberCounts = {}
+  people.forEach(p => {
+    if (p.team_id) memberCounts[p.team_id] = (memberCounts[p.team_id] || 0) + 1
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-gray-900">Delete Teams</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          {teams.length === 0 && (
+            <p className="px-6 py-4 text-sm text-gray-400">No teams yet.</p>
+          )}
+          {teams.map(team => {
+            const count = memberCounts[team.id] || 0
+            const isConfirming = confirming === team.id
+            return (
+              <div key={team.id} className={`px-6 py-3 ${isConfirming ? 'bg-red-50' : ''}`}>
+                {!isConfirming ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{team.name}</p>
+                      <p className="text-xs text-gray-400">{count} member{count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <button
+                      onClick={() => { setConfirming(team.id); setAlsoDeleteMembers(false) }}
+                      className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-700 font-medium">Delete &ldquo;{team.name}&rdquo;?</p>
+                    {count > 0 && (
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alsoDeleteMembers}
+                          onChange={e => setAlsoDeleteMembers(e.target.checked)}
+                          className="rounded"
+                        />
+                        Also delete {count} member{count !== 1 ? 's' : ''} from the database
+                      </label>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { onDeleteTeam(team.id, alsoDeleteMembers); setConfirming(null) }}
+                        className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Yes, Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirming(null)}
+                        className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200">
+          <button onClick={onClose} className="text-sm font-medium text-gray-500 hover:text-gray-800">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Edit / Add panel ──────────────────────────────────────────────────────────
 function EditTeamPanel({ team, people, onSave, onCancel, onMemberAddBatch, onMemberRemove }) {
   const [form, setForm] = useState({
@@ -240,6 +321,7 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null) // team id | 'new' | null
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [deleteTeamsModal, setDeleteTeamsModal] = useState(false)
   const [search, setSearch] = useState('')
 
   useEffect(() => { load() }, [])
@@ -272,9 +354,13 @@ export default function TeamsPage() {
     }
   }
 
-  async function handleDeleteTeam(id) {
+  async function handleDeleteTeam(id, alsoDeleteMembers = false) {
+    if (alsoDeleteMembers) {
+      await supabase.from('people').delete().eq('team_id', id)
+    }
     await supabase.from('teams').delete().eq('id', id)
     setDeleteConfirm(null)
+    setDeleteTeamsModal(false)
     if (editingId === id) setEditingId(null)
     load()
   }
@@ -303,14 +389,30 @@ export default function TeamsPage() {
 
   return (
     <Layout>
+      {deleteTeamsModal && (
+        <DeleteTeamsModal
+          teams={teams}
+          people={people}
+          onDeleteTeam={handleDeleteTeam}
+          onClose={() => setDeleteTeamsModal(false)}
+        />
+      )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Teams</h1>
-        <button
-          onClick={() => setEditingId('new')}
-          className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          + Add Team
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setDeleteTeamsModal(true)}
+            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Delete Teams
+          </button>
+          <button
+            onClick={() => setEditingId('new')}
+            className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            + Add Team
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
