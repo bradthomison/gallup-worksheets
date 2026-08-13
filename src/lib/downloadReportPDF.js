@@ -88,8 +88,11 @@ async function buildReportPDF(reportName, personName, strengths, rowLabels, getC
   // Head row at 14pt, 5pt padding each side
   const headFontSize = 14
   doc.setFontSize(headFontSize)
-  const headRowH = headFontSize * doc.getLineHeightFactor() + 10
-  const maxBodyH = availableH - headRowH
+  const lineWidth = 0.5
+  const headRowH = headFontSize * doc.getLineHeightFactor() + 10 + lineWidth
+  // Subtract border overhead: one border per body row + head/body divider + small buffer
+  const borderOverhead = (numRows + 1) * lineWidth + 4
+  const maxBodyH = availableH - headRowH - borderOverhead
 
   // Col 0: 12pt bold, wraps freely — compute how tall each label is
   const col0FS = 12
