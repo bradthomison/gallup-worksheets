@@ -320,7 +320,6 @@ export default function TeamsPage() {
   const [people, setPeople] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState(null) // team id | 'new' | null
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleteTeamsModal, setDeleteTeamsModal] = useState(false)
   const [search, setSearch] = useState('')
 
@@ -359,7 +358,6 @@ export default function TeamsPage() {
       await supabase.from('people').delete().eq('team_id', id)
     }
     await supabase.from('teams').delete().eq('id', id)
-    setDeleteConfirm(null)
     setDeleteTeamsModal(false)
     if (editingId === id) setEditingId(null)
     load()
@@ -469,7 +467,7 @@ export default function TeamsPage() {
                 const memberCount = people.filter(p => p.team_id === team.id).length
                 return (
                   <>
-                    <tr key={team.id} className="hover:bg-gray-50 transition-colors group">
+                    <tr key={team.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{team.name}</p>
                       </td>
@@ -489,28 +487,12 @@ export default function TeamsPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {deleteConfirm === team.id ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-500">Delete team?</span>
-                            <button onClick={() => handleDeleteTeam(team.id)} className="text-xs text-red-600 font-medium hover:underline">Yes</button>
-                            <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:underline">No</button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => setEditingId(editingId === team.id ? null : team.id)}
-                              className="text-xs text-brand-500 font-medium hover:underline"
-                            >
-                              {editingId === team.id ? 'Close' : 'Edit'}
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(team.id)}
-                              className="text-xs text-red-400 font-medium hover:underline"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          onClick={() => setEditingId(editingId === team.id ? null : team.id)}
+                          className="text-xs text-brand-500 font-medium hover:underline"
+                        >
+                          {editingId === team.id ? 'Close' : 'Edit'}
+                        </button>
                       </td>
                     </tr>
                     {/* Inline edit panel */}
