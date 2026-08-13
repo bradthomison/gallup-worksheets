@@ -10,9 +10,7 @@ import { downloadPersonalInsightsPDF, downloadCustomReportPDF, downloadBringNeed
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import PersonalInsightsModal, { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
-import PersonalInsightsBulkModal from '../components/PersonalInsightsBulkModal'
-import BringNeedModal from '../components/BringNeedModal'
-import BringNeedBulkModal from '../components/BringNeedBulkModal'
+import BringNeedModal, { buildBringNeedPrintHTML } from '../components/BringNeedModal'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -868,9 +866,8 @@ export default function ParticipantsPage() {
   const [saveError, setSaveError] = useState(null)
   const [expandedPersonId, setExpandedPersonId] = useState(null)
   const [insightsModal, setInsightsModal] = useState(null)
-  const [bulkInsightsModal, setBulkInsightsModal] = useState(false)
+  const [bulkReportModal, setBulkReportModal] = useState(null) // null | 'insights' | 'bringneed'
   const [bringNeedModal, setBringNeedModal] = useState(null)
-  const [bulkBringNeedModal, setBulkBringNeedModal] = useState(false)
   const [reportsPersonId, setReportsPersonId] = useState(null)
   const [customReportModal, setCustomReportModal] = useState(null)
   const [reports, setReports] = useState([])
@@ -925,6 +922,47 @@ export default function ParticipantsPage() {
     setDeleteConfirm(null)
     setExpandedPersonId(null)
     load()
+  }
+
+  function handleBulkPrint(type) {
+    const toPrint = people.filter(p => selectedIds.has(p.id) && (p.top5 ?? []).some(Boolean))
+    if (toPrint.length === 0) return
+    const isInsights = type === 'insights'
+    const pages = toPrint.map(p =>
+      isInsights
+        ? buildPersonalInsightsPrintHTML(p.name, (p.top5 ?? []).filter(Boolean))
+        : buildBringNeedPrintHTML(p.name, (p.top5 ?? []).filter(Boolean))
+    )
+    const pageSize = isInsights ? 'size:landscape;margin:0.35in;' : 'size:portrait;margin:0.4in;'
+    const title = isInsights ? 'Personal Insights Reports' : 'Bring - Need Reports'
+    const combined = `<!DOCTYPE html><html><head><title>${title}</title>
+<style>
+*{box-sizing:border-box;}html,body{margin:0;padding:0;font-family:Arial,sans-serif;}
+.page{display:flex;flex-direction:column;height:100vh;page-break-after:always;}
+.page:last-child{page-break-after:auto;}
+h2{font-size:13px;margin:0 0 4px 0;color:#111;flex-shrink:0;}
+table{border-collapse:collapse;width:100%;table-layout:fixed;flex:1;}
+th,td{word-wrap:break-word;overflow-wrap:break-word;}
+tfoot td{border-top:1px solid #d1d5db;padding:2px 5px;font-size:8px;color:#9ca3af;}
+@page{${pageSize}}-webkit-print-color-adjust:exact;print-color-adjust:exact;
+</style></head><body>
+${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<div class="page">${m ? m[1] : html}</div>` }).join('\n')}
+</body></html>`
+    const win = window.open('', '_blank')
+    win.document.write(combined)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 250)
+    setBulkReportModal(null)
+  }
+
+  async function handleBulkDownloadPDFs(type) {
+    const toDownload = people.filter(p => selectedIds.has(p.id) && (p.top5 ?? []).some(Boolean))
+    setBulkReportModal(null)
+    for (const person of toDownload) {
+      if (type === 'insights') await downloadPersonalInsightsPDF(person)
+      else await downloadBringNeedPDF(person)
+    }
   }
 
   async function handlePasteSave() {
@@ -989,24 +1027,52 @@ export default function ParticipantsPage() {
           onClose={() => setCustomReportModal(null)}
         />
       )}
-      {bulkInsightsModal && (
-        <PersonalInsightsBulkModal
-          people={people}
-          teams={teams}
-          onClose={() => setBulkInsightsModal(false)}
-        />
-      )}
+      {bulkReportModal && (() => {
+        const isInsights = bulkReportModal === 'insights'
+        const eligible = people.filter(p => selectedIds.has(p.id) && (p.top5 ?? []).some(Boolean))
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+              <h2 className="text-lg font-bold text-gray-900">
+                {isInsights ? 'Personal Insights Reports' : 'Bring - Need Reports'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {eligible.length} participant{eligible.length !== 1 ? 's' : ''} selected
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => handleBulkPrint(bulkReportModal)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  Print All
+                </button>
+                <button
+                  onClick={() => handleBulkDownloadPDFs(bulkReportModal)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors"
+                >
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download PDFs
+                </button>
+                <button
+                  onClick={() => setBulkReportModal(null)}
+                  className="w-full px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
       {bringNeedModal && (
         <BringNeedModal
           participant={bringNeedModal}
           onClose={() => setBringNeedModal(null)}
-        />
-      )}
-      {bulkBringNeedModal && (
-        <BringNeedBulkModal
-          people={people}
-          teams={teams}
-          onClose={() => setBulkBringNeedModal(false)}
         />
       )}
       {addTeamModal && (
@@ -1059,13 +1125,13 @@ export default function ParticipantsPage() {
                 {selectedIds.size} participant{selectedIds.size !== 1 ? 's' : ''} selected
               </span>
               <button
-                onClick={() => setBulkInsightsModal(true)}
+                onClick={() => setBulkReportModal('insights')}
                 className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-300 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
               >
                 Personal Insights Reports
               </button>
               <button
-                onClick={() => setBulkBringNeedModal(true)}
+                onClick={() => setBulkReportModal('bringneed')}
                 className="text-sm font-semibold text-emerald-700 hover:text-emerald-900 border border-emerald-300 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
               >
                 Bring - Need Reports
