@@ -98,6 +98,87 @@ function AddTeamModal({ onSave, onClose }) {
   )
 }
 
+// ── Manage Teams modal ────────────────────────────────────────────────────────
+function ManageTeamsModal({ teams, people, onDeleteTeam, onClose }) {
+  const [confirming, setConfirming] = useState(null)
+  const [alsoDeleteMembers, setAlsoDeleteMembers] = useState(false)
+
+  const memberCounts = {}
+  people.forEach(p => {
+    if (p.team_id) memberCounts[p.team_id] = (memberCounts[p.team_id] || 0) + 1
+  })
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-bold text-gray-900">Manage Teams</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+        <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          {teams.length === 0 && (
+            <p className="px-6 py-4 text-sm text-gray-400">No teams yet.</p>
+          )}
+          {teams.map(team => {
+            const count = memberCounts[team.id] || 0
+            const isConfirming = confirming === team.id
+            return (
+              <div key={team.id} className={`px-6 py-3 ${isConfirming ? 'bg-red-50' : ''}`}>
+                {!isConfirming ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{team.name}</p>
+                      <p className="text-xs text-gray-400">{count} member{count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <button
+                      onClick={() => { setConfirming(team.id); setAlsoDeleteMembers(false) }}
+                      className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-700 font-medium">Delete &ldquo;{team.name}&rdquo;?</p>
+                    {count > 0 && (
+                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={alsoDeleteMembers}
+                          onChange={e => setAlsoDeleteMembers(e.target.checked)}
+                          className="rounded"
+                        />
+                        Also delete {count} member{count !== 1 ? 's' : ''} from the database
+                      </label>
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { onDeleteTeam(team.id, alsoDeleteMembers); setConfirming(null) }}
+                        className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Yes, Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirming(null)}
+                        className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-white px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-200">
+          <button onClick={onClose} className="text-sm font-medium text-gray-500 hover:text-gray-800">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Edit / Add row ────────────────────────────────────────────────────────────
 function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, onDeletePerson }) {
   const [form, setForm] = useState({
@@ -143,6 +224,7 @@ function EditRow({ person, teams, onSave, onCancel, onOpenAddTeam, onDeletePerso
 
   return (
     <tr className="bg-blue-50">
+      <td className="w-8 px-3 py-2"></td>
       <td className="px-4 py-2">
         <input
           value={form.name}
@@ -862,6 +944,9 @@ export default function ParticipantsPage() {
   const [pasteTeamId, setPasteTeamId] = useState('')
   const [search, setSearch] = useState(() => searchParams.get('team') ?? '')
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [manageTeamsModal, setManageTeamsModal] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [expandedPersonId, setExpandedPersonId] = useState(null)
   const [insightsModal, setInsightsModal] = useState(null)
@@ -912,6 +997,24 @@ export default function ParticipantsPage() {
     setDeleteConfirm(null)
     setEditingId(null)
     setExpandedPersonId(null)
+    load()
+  }
+
+  async function handleBulkDelete() {
+    await supabase.from('people').delete().in('id', [...selectedIds])
+    setSelectedIds(new Set())
+    setBulkDeleteConfirm(false)
+    setDeleteConfirm(null)
+    setExpandedPersonId(null)
+    load()
+  }
+
+  async function handleDeleteTeam(teamId, alsoDeleteMembers) {
+    if (alsoDeleteMembers) {
+      await supabase.from('people').delete().eq('team_id', teamId)
+    }
+    await supabase.from('teams').delete().eq('id', teamId)
+    setManageTeamsModal(false)
     load()
   }
 
@@ -1003,11 +1106,25 @@ export default function ParticipantsPage() {
           onClose={() => { setAddTeamModal(false); setAddTeamCallback(null) }}
         />
       )}
+      {manageTeamsModal && (
+        <ManageTeamsModal
+          teams={teams}
+          people={people}
+          onDeleteTeam={handleDeleteTeam}
+          onClose={() => setManageTeamsModal(false)}
+        />
+      )}
 
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
         <div className="flex flex-col items-end gap-2">
           <div className="flex gap-2">
+            <button
+              onClick={() => setManageTeamsModal(true)}
+              className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+            >
+              Manage Teams
+            </button>
             <button
               onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
               className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
@@ -1055,6 +1172,48 @@ export default function ParticipantsPage() {
           </button>
         )}
       </div>
+
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
+          {!bulkDeleteConfirm ? (
+            <>
+              <span className="text-sm text-gray-700 font-medium">
+                {selectedIds.size} participant{selectedIds.size !== 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                className="text-sm font-semibold text-red-600 hover:text-red-800 border border-red-300 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Delete {selectedIds.size} Selected
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-xs text-gray-400 hover:text-gray-600 ml-auto whitespace-nowrap"
+              >
+                Clear selection
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-red-700 font-medium">
+                Permanently delete {selectedIds.size} participant{selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.
+              </span>
+              <button
+                onClick={handleBulkDelete}
+                className="text-sm font-semibold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="text-sm text-gray-500 hover:text-gray-800 whitespace-nowrap"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Paste multiple panel */}
       {addingNew && addMode === 'paste' && (
@@ -1136,6 +1295,19 @@ export default function ParticipantsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
               <tr>
+                <th className="w-8 px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every(p => selectedIds.has(p.id))}
+                    ref={el => { if (el) el.indeterminate = filtered.some(p => selectedIds.has(p.id)) && !filtered.every(p => selectedIds.has(p.id)) }}
+                    onChange={e => {
+                      const next = new Set(selectedIds)
+                      filtered.forEach(p => e.target.checked ? next.add(p.id) : next.delete(p.id))
+                      setSelectedIds(next)
+                    }}
+                    className="rounded"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left font-medium">Name</th>
                 <th className="px-4 py-3 text-left font-medium">Email</th>
                 <th className="px-4 py-3 text-left font-medium">Top 5 Strengths</th>
@@ -1155,7 +1327,7 @@ export default function ParticipantsPage() {
               )}
               {filtered.length === 0 && !addingNew && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">
+                  <td colSpan={6} className="px-5 py-8 text-center text-gray-400 text-sm">
                     {search ? 'No results.' : 'No participants yet. Add your first person above.'}
                   </td>
                 </tr>
@@ -1175,6 +1347,19 @@ export default function ParticipantsPage() {
                 ) : (
                   <>
                     <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="w-8 px-3 py-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.id)}
+                          onChange={e => {
+                            const next = new Set(selectedIds)
+                            if (e.target.checked) next.add(p.id)
+                            else next.delete(p.id)
+                            setSelectedIds(next)
+                          }}
+                          className="rounded"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{p.name}</p>
                       </td>
@@ -1226,7 +1411,7 @@ export default function ParticipantsPage() {
                     </tr>
                     {expandedPersonId === p.id && deleteConfirm !== p.id && (
                       <tr key={`${p.id}-panel`}>
-                        <td colSpan={5} className="p-0">
+                        <td colSpan={6} className="p-0">
                           <PersonWorksheetPanel
                             person={p}
                             onClose={() => setExpandedPersonId(null)}
@@ -1236,7 +1421,7 @@ export default function ParticipantsPage() {
                     )}
                     {reportsPersonId === p.id && deleteConfirm !== p.id && (
                       <tr key={`${p.id}-reports-panel`}>
-                        <td colSpan={5} className="p-0">
+                        <td colSpan={6} className="p-0">
                           <PersonReportsPanel
                             person={p}
                             reports={reports}
@@ -1250,7 +1435,7 @@ export default function ParticipantsPage() {
                     )}
                     {deleteConfirm === p.id && (
                       <tr key={`${p.id}-del`}>
-                        <td colSpan={5} className="px-4 py-2 bg-red-50 border-t border-red-100">
+                        <td colSpan={6} className="px-4 py-2 bg-red-50 border-t border-red-100">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-gray-600">Delete {p.name}? This will also remove all their worksheets and responses.</span>
                             <button onClick={() => handleDelete(p.id)} className="text-xs text-red-600 font-medium hover:underline">Yes, Delete</button>
