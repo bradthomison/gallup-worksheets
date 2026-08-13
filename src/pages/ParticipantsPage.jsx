@@ -1327,7 +1327,7 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
                       </td>
                       <td className="px-4 py-3">
                         {team ? (
-                          <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium">
+                          <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
                             {team.name}
                           </span>
                         ) : (
