@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { BRING_NEED } from '../data/bringNeed'
 import { getStrengthColors } from '../lib/strengthColors'
-import { downloadBringNeedPDF } from '../lib/downloadReportPDF'
+import { downloadBringNeedPDF, getBringNeedPDFBase64 } from '../lib/downloadReportPDF'
 import { buildBringNeedPrintHTML } from '../components/BringNeedModal'
 import SiteFooter from '../components/SiteFooter'
 
@@ -17,6 +17,7 @@ export default function BringNeedLMSPage() {
   const [insights, setInsights] = useState(null)
   const [error, setError] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [emailStatus, setEmailStatus] = useState(null) // null | 'loading' | 'sent' | 'error'
 
   async function lookupByEmail(emailVal) {
     setLoading(true)
@@ -64,6 +65,22 @@ export default function BringNeedLMSPage() {
   useEffect(() => {
     if (emailParam) lookupByEmail(emailParam)
   }, [])
+
+  async function handleEmailPDF() {
+    setEmailStatus('loading')
+    try {
+      const pdf_base64 = await getBringNeedPDFBase64({ ...person, top5: strengths })
+      const { error: fnErr } = await supabase.functions.invoke('send-report-pdf', {
+        body: { to_email: email, to_name: person.name, report_name: 'Bring - Need', pdf_base64 },
+      })
+      if (fnErr) throw fnErr
+      setEmailStatus('sent')
+      setTimeout(() => setEmailStatus(null), 4000)
+    } catch {
+      setEmailStatus('error')
+      setTimeout(() => setEmailStatus(null), 4000)
+    }
+  }
 
   const strengths = (person?.top5?.filter(Boolean) ?? []).filter(s => BRING_NEED[s])
 
@@ -153,6 +170,21 @@ export default function BringNeedLMSPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   {pdfLoading ? 'Generating…' : 'Download PDF'}
+                </button>
+                <button
+                  onClick={handleEmailPDF}
+                  disabled={emailStatus === 'loading'}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-sm font-medium transition-colors"
+                  style={{ color: emailStatus === 'sent' ? '#059669' : emailStatus === 'error' ? '#dc2626' : '#374151' }}
+                >
+                  {emailStatus === 'loading' ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  ) : emailStatus === 'sent' ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  )}
+                  {emailStatus === 'loading' ? 'Sending…' : emailStatus === 'sent' ? 'Sent!' : emailStatus === 'error' ? 'Failed — retry' : 'Email PDF'}
                 </button>
                 <button
                   onClick={() => {

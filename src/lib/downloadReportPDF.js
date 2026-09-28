@@ -225,7 +225,7 @@ export async function downloadCustomReportPDF(reportName, person, rows, insights
 
 // Bring - Need lays strengths down the side (one row per theme) with two
 // columns — "I Bring" and "I Need" — instead of strengths across the top.
-export async function downloadBringNeedPDF(person) {
+async function buildBringNeedDoc(person) {
   const strengths = (person.top5 ?? []).filter(s => BRING_NEED[s])
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' })
@@ -333,5 +333,43 @@ export async function downloadBringNeedPDF(person) {
     )
   }
 
+  return doc
+}
+
+export async function downloadBringNeedPDF(person) {
+  const doc = await buildBringNeedDoc(person)
   doc.save(safeName(`${person.name} - Bring - Need.pdf`))
+}
+
+// ── Base64 getters for email attachment ───────────────────────────────────────
+
+export async function getPersonalInsightsPDFBase64(person) {
+  const strengths = (person.top5 ?? []).filter(s => PERSONAL_INSIGHTS[s])
+  const rowLabels = ROWS.map((row, i) => i === 0 ? person.name : row.label)
+  const doc = await buildReportPDF(
+    'Personal Insights',
+    person.name,
+    strengths,
+    rowLabels,
+    (ri, ci) => PERSONAL_INSIGHTS[strengths[ci]]?.[ROWS[ri].key] ?? '',
+  )
+  return doc.output('datauristring').split(',')[1]
+}
+
+export async function getBringNeedPDFBase64(person) {
+  const doc = await buildBringNeedDoc(person)
+  return doc.output('datauristring').split(',')[1]
+}
+
+export async function getCustomReportPDFBase64(reportName, person, rows, insights) {
+  const strengths = (person.top5 ?? []).filter(Boolean)
+  const rowLabels = rows.map(r => r.label)
+  const doc = await buildReportPDF(
+    reportName,
+    person.name,
+    strengths,
+    rowLabels,
+    (ri, ci) => insights?.[strengths[ci]]?.[rows[ri].id] ?? '',
+  )
+  return doc.output('datauristring').split(',')[1]
 }
