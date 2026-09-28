@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
@@ -8,13 +8,15 @@ import SiteFooter from '../components/SiteFooter'
 export default function TeamPortalPage() {
   const { teamId } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const memberParam = searchParams.get('member')
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [team, setTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [reports, setReports] = useState([])
-  const [selected, setSelected] = useState(null) // person object
+  const [selected, setSelected] = useState(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -24,8 +26,13 @@ export default function TeamPortalPage() {
         setNotFound(true)
       } else {
         setTeam(data.team)
-        setMembers(data.members ?? [])
+        const loadedMembers = data.members ?? []
+        setMembers(loadedMembers)
         setReports(data.reports ?? [])
+        if (memberParam) {
+          const pre = loadedMembers.find(m => m.id === memberParam)
+          if (pre) setSelected(pre)
+        }
       }
       setLoading(false)
     }
@@ -173,7 +180,7 @@ export default function TeamPortalPage() {
                   {filtered.map(m => (
                     <button
                       key={m.id}
-                      onClick={() => setSelected(m)}
+                      onClick={() => { setSelected(m); navigate(`/team/${teamId}?member=${m.id}`, { replace: true }) }}
                       className="flex items-center gap-3 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-xl px-5 py-4 text-left transition-colors group"
                     >
                       <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-semibold text-sm shrink-0 group-hover:bg-brand-200 transition-colors">
@@ -193,7 +200,7 @@ export default function TeamPortalPage() {
           <>
             <div className="mb-8">
               <button
-                onClick={() => { setSelected(null); setSearch('') }}
+                onClick={() => { setSelected(null); setSearch(''); navigate(`/team/${teamId}`, { replace: true }) }}
                 className="flex items-center gap-1.5 text-sm text-brand-500 hover:text-brand-700 font-medium mb-4 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
