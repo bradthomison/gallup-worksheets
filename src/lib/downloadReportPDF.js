@@ -375,6 +375,9 @@ export async function downloadPowerOf2PDF(personA, personB) {
   const labelColW = 148
   const contentColW = (usableWidth - labelColW) / Math.max(colStrengths.length, 1)
   const cellPad = 5
+  const footerReserved = 30
+  const availableH = pageHeight - startY - footerReserved
+  const borderOverhead = (rowStrengths.length + 1) * 0.5 + 4
 
   const colHeaderColors = colStrengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
   const rowHeaderColors = rowStrengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
@@ -383,16 +386,53 @@ export async function downloadPowerOf2PDF(personA, personB) {
     `${personA.name}\n(rows)  ×  ${personB.name}\n(columns)`,
     ...colStrengths.map(s => `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`),
   ]
-
   const bodyRows = rowStrengths.map(s => [
     `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`,
     ...colStrengths.map(() => ''),
   ])
 
-  const footerReserved = 30
-  const availableH = pageHeight - startY - footerReserved
-  const headerRowH = 72
-  const bodyRowH = Math.max(60, (availableH - headerRowH) / Math.max(rowStrengths.length, 1))
+  // Measure the actual header row height and per-body-row height at a given font size,
+  // then find the largest font that fits everything on one page.
+  function measureHeights(fs) {
+    doc.setFontSize(fs)
+    doc.setFont('helvetica', 'normal')
+    const lh = fs * doc.getLineHeightFactor()
+    const contentInnerW = contentColW - 2 * cellPad
+    const labelInnerW = labelColW - 2 * cellPad
+
+    // Header row: tallest of corner cell and all column header cells
+    let maxHeadLines = countLines(doc, headRow[0], labelInnerW)
+    for (let i = 1; i < headRow.length; i++) {
+      maxHeadLines = Math.max(maxHeadLines, countLines(doc, headRow[i], contentInnerW))
+    }
+    const headH = maxHeadLines * lh + 2 * cellPad
+
+    // Each body row: driven by its row-header label (content cells are blank)
+    const rowHeights = bodyRows.map(row => countLines(doc, row[0], labelInnerW) * lh + 2 * cellPad)
+    const totalBodyH = rowHeights.reduce((a, b) => a + b, 0)
+
+    return { headH, rowHeights, totalBodyH, lh }
+  }
+
+  // Try from 8.5pt down to 6pt until it fits
+  let fs = 8.5
+  let headH, rowHeights, totalBodyH
+  for (let tryFs = 8.5; tryFs >= 6; tryFs -= 0.5) {
+    const m = measureHeights(tryFs)
+    if (m.headH + m.totalBodyH + borderOverhead <= availableH) {
+      fs = tryFs; headH = m.headH; rowHeights = m.rowHeights; totalBodyH = m.totalBodyH
+      break
+    }
+    if (tryFs <= 6) {
+      // Fallback: use 6pt and force-fit
+      const m6 = measureHeights(6)
+      fs = 6; headH = m6.headH; rowHeights = m6.rowHeights; totalBodyH = m6.totalBodyH
+    }
+  }
+
+  // Distribute remaining vertical space evenly across body rows
+  const extraPerRow = Math.max(0, availableH - headH - totalBodyH - borderOverhead) / Math.max(rowStrengths.length, 1)
+  const finalRowHeights = rowHeights.map(h => h + extraPerRow)
 
   const columnStyles = { 0: { cellWidth: labelColW } }
   for (let i = 1; i <= colStrengths.length; i++) {
@@ -405,8 +445,8 @@ export async function downloadPowerOf2PDF(personA, personB) {
     startY,
     tableWidth: usableWidth,
     margin: { left: 20, right: 20 },
-    styles: { fontSize: 7.5, cellPadding: cellPad, valign: 'top', overflow: 'linebreak', lineColor: [210, 210, 210], lineWidth: 0.5 },
-    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, valign: 'top', cellPadding: cellPad, minCellHeight: headerRowH },
+    styles: { fontSize: fs, cellPadding: cellPad, valign: 'top', overflow: 'linebreak', lineColor: [210, 210, 210], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fs, valign: 'top', cellPadding: cellPad, minCellHeight: headH },
     columnStyles,
     bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
     didParseCell(data) {
@@ -422,24 +462,22 @@ export async function downloadPowerOf2PDF(personA, personB) {
         data.cell.styles.fontStyle = 'bold'
       }
       if (data.section === 'body') {
-        data.cell.styles.minCellHeight = bodyRowH
+        data.cell.styles.minCellHeight = finalRowHeights[data.row.index]
       }
     },
   })
 
-  const pageCount = doc.internal.getNumberOfPages()
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(6)
-    doc.setTextColor(170, 170, 170)
-    doc.setDrawColor(210, 210, 210)
-    doc.line(20, pageHeight - 22, pageWidth - 20, pageHeight - 22)
-    doc.text(
-      'Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.',
-      pageWidth / 2, pageHeight - 12, { align: 'center' }
-    )
-  }
+  // Footer (first page only — we intend single-page output)
+  doc.setPage(1)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(6)
+  doc.setTextColor(170, 170, 170)
+  doc.setDrawColor(210, 210, 210)
+  doc.line(20, pageHeight - 22, pageWidth - 20, pageHeight - 22)
+  doc.text(
+    'Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.',
+    pageWidth / 2, pageHeight - 12, { align: 'center' }
+  )
 
   doc.save(safeName(`${personA.name} & ${personB.name} - Power of 2.pdf`))
 }

@@ -327,12 +327,15 @@ export default function PowerOf2LMSPage() {
                   </table>
                 </div>
 
-                <p className="text-xs text-gray-400 mb-8 print:mb-4">
+                <p className="text-xs text-gray-400 mb-8 print:hidden">
+                  Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
+                </p>
+                <p className="hidden print:block text-[9px] text-gray-400 mb-4">
                   Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
                 </p>
 
-                {/* Instructions */}
-                <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 print:mt-8">
+                {/* Instructions — screen only */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 print:hidden">
                   <h2 className="text-lg font-bold text-gray-900 mb-1">Power of 2 Worksheet – Instructions</h2>
                   <p className="text-sm text-gray-500 mb-5">
                     The Power of 2 worksheet helps paired participants understand how their CliftonStrengths interact in day-to-day work. By examining the intersections of each person's Top 5 strengths, partners identify what they bring to the collaboration and what they need from one another to work effectively.
