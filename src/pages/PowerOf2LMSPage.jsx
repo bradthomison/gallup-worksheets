@@ -62,8 +62,8 @@ export default function PowerOf2LMSPage() {
   const [teamName, setTeamName] = useState('')
   const [error, setError] = useState(null)
   const [partner, setPartner] = useState(null)
-  const [partnerSearch, setPartnerSearch] = useState('')
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [cells, setCells] = useState({})
 
   async function loadData(emailVal, teamId) {
     setLoading(true)
@@ -119,9 +119,7 @@ export default function PowerOf2LMSPage() {
   const rowStrengths = (person?.top5 ?? []).filter(s => POWER_OF_2[s])
   const colStrengths = (partner?.top5 ?? []).filter(s => POWER_OF_2[s])
 
-  const filteredMembers = teamMembers.filter(m =>
-    m.name.toLowerCase().includes(partnerSearch.toLowerCase())
-  )
+  function cellKey(row, col) { return `${row}||${col}` }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -178,80 +176,25 @@ export default function PowerOf2LMSPage() {
             </div>
           </div>
 
-        ) : !partner ? (
-          <div className="max-w-xl mx-auto">
-            <div className="mb-6">
-              <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-1">{teamName}</p>
-              <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
-              <p className="text-gray-500 text-sm mt-1">Hi {person.name.split(' ')[0]}! Who would you like to pair with?</p>
-            </div>
-
-            {teamMembers.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-                <p className="text-gray-500 text-sm">No other team members found.</p>
-                <p className="text-xs text-gray-400 mt-1">Contact your coach to add teammates.</p>
-              </div>
-            ) : (
-              <>
-                {teamMembers.length > 5 && (
-                  <div className="mb-3">
-                    <input
-                      type="search"
-                      value={partnerSearch}
-                      onChange={e => setPartnerSearch(e.target.value)}
-                      placeholder="Search teammates…"
-                      autoFocus
-                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {filteredMembers.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => setPartner(m)}
-                      className="flex items-center gap-3 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-xl px-5 py-4 text-left transition-colors group"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-semibold text-sm shrink-0 group-hover:bg-brand-200 transition-colors">
-                        {m.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                      </div>
-                      <span className="font-medium text-gray-900 text-sm">{m.name}</span>
-                    </button>
-                  ))}
-                  {filteredMembers.length === 0 && (
-                    <p className="col-span-2 text-sm text-gray-400 text-center py-6">No matches for &ldquo;{partnerSearch}&rdquo;</p>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
         ) : (
           <div>
             {/* Top bar */}
-            <div className="flex items-start justify-between mb-6 flex-wrap gap-3 print:hidden">
+            <div className="flex items-start justify-between mb-6 flex-wrap gap-4 print:hidden">
               <div>
-                <button
-                  onClick={() => setPartner(null)}
-                  className="flex items-center gap-1.5 text-sm text-brand-500 hover:text-brand-700 font-medium mb-2 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Change partner
-                </button>
+                <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-0.5">{teamName}</p>
                 <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
-                <p className="text-gray-500 text-sm mt-0.5">{person.name} &amp; {partner.name}</p>
+                <p className="text-gray-500 text-sm mt-0.5">Hi {person.name.split(' ')[0]}! Select a partner below to begin.</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={async () => {
+                    if (!partner) return
                     setPdfLoading(true)
                     await downloadPowerOf2PDF(person, partner)
                     setPdfLoading(false)
                   }}
-                  disabled={pdfLoading}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-700 text-sm font-medium"
+                  disabled={pdfLoading || !partner}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 text-gray-700 text-sm font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -260,7 +203,8 @@ export default function PowerOf2LMSPage() {
                 </button>
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium"
+                  disabled={!partner}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-40 text-white text-sm font-medium"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -270,108 +214,159 @@ export default function PowerOf2LMSPage() {
               </div>
             </div>
 
-            {/* Worksheet grid */}
-            <div className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-6"
-              style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}>
-              <table className="w-full border-collapse text-xs" style={{ minWidth: `${180 + colStrengths.length * 200}px` }}>
-                <colgroup>
-                  <col style={{ width: '180px' }} />
-                  {colStrengths.map(s => <col key={s} style={{ minWidth: '200px' }} />)}
-                </colgroup>
-
-                {/* Column header row — partner's strengths */}
-                <thead>
-                  <tr>
-                    {/* Top-left corner */}
-                    <th className="border border-gray-200 bg-gray-50 p-3 align-bottom text-left">
-                      <p className="font-semibold text-gray-700 text-xs">{person.name}</p>
-                      <p className="text-gray-400 text-[10px] mt-0.5">↓ rows</p>
-                      <p className="font-semibold text-gray-700 text-xs mt-2">{partner.name}</p>
-                      <p className="text-gray-400 text-[10px] mt-0.5">→ columns</p>
-                    </th>
-                    {colStrengths.map(s => {
-                      const c = getStrengthColors(s)
-                      return (
-                        <th
-                          key={s}
-                          className="border border-gray-200 p-3 text-left align-top font-normal"
-                          style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
-                        >
-                          <p className="font-bold text-sm mb-1.5">{s}</p>
-                          <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
-                          <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
-                        </th>
-                      )
-                    })}
-                  </tr>
-                </thead>
-
-                {/* Body rows — person's strengths */}
-                <tbody>
-                  {rowStrengths.map(s => {
-                    const c = getStrengthColors(s)
-                    return (
-                      <tr key={s}>
-                        <th
-                          className="border border-gray-200 p-3 text-left align-top font-normal"
-                          style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
-                        >
-                          <p className="font-bold text-sm mb-1.5">{s}</p>
-                          <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
-                          <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
-                        </th>
-                        {colStrengths.map(cs => (
-                          <td
-                            key={cs}
-                            className="border border-gray-200 bg-white"
-                            style={{ minHeight: '120px', height: '120px' }}
-                          />
-                        ))}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            {/* Partner selector */}
+            <div className="mb-6 print:hidden">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Pair with
+              </label>
+              {teamMembers.length === 0 ? (
+                <p className="text-sm text-gray-500">No other team members found. Contact your coach to add teammates.</p>
+              ) : (
+                <select
+                  value={partner?.id ?? ''}
+                  onChange={e => {
+                    const m = teamMembers.find(m => m.id === e.target.value) ?? null
+                    setPartner(m)
+                    setCells({})
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 min-w-[240px]"
+                >
+                  <option value="">Select a partner…</option>
+                  {teamMembers.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
-            <p className="text-xs text-gray-400 mb-8 print:mb-4">
-              Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
-            </p>
-
-            {/* Instructions */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 print:mt-8">
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Power of 2 Worksheet – Instructions</h2>
-              <p className="text-sm text-gray-500 mb-5">
-                The Power of 2 worksheet helps paired participants understand how their CliftonStrengths interact in day-to-day work. By examining the intersections of each person's Top 5 strengths, partners identify what they bring to the collaboration and what they need from one another to work effectively.
-              </p>
-
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">How to Use the Worksheet</h3>
-              <div className="space-y-5">
-                {INSTRUCTIONS.map((section, i) => (
-                  <div key={i}>
-                    <p className="text-sm font-semibold text-gray-800 mb-1.5">{i + 1}. {section.title}</p>
-                    <ul className="space-y-1">
-                      {section.body.map((line, j) => (
-                        <li key={j} className="flex gap-2 text-sm text-gray-600">
-                          <span className="text-gray-300 mt-0.5 shrink-0">•</span>
-                          <span>{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+            {!partner ? (
+              <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-16 text-center">
+                <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p className="text-gray-500 text-sm font-medium">Select a partner above to load the worksheet.</p>
               </div>
+            ) : (
+              <>
+                {/* Print-only header */}
+                <div className="hidden print:block mb-4">
+                  <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
+                  <p className="text-gray-600 text-sm mt-0.5">{person.name} &amp; {partner.name}</p>
+                </div>
 
-              <h3 className="text-sm font-semibold text-gray-700 mt-6 mb-3">Guidelines for Productive Discussion</h3>
-              <ul className="space-y-1">
-                {GUIDELINES.map((g, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-gray-600">
-                    <span className="text-gray-300 mt-0.5 shrink-0">•</span>
-                    <span>{g}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                {/* Worksheet grid */}
+                <div
+                  className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-3"
+                  style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                >
+                  <table className="w-full border-collapse text-xs" style={{ minWidth: `${180 + colStrengths.length * 200}px` }}>
+                    <colgroup>
+                      <col style={{ width: '180px' }} />
+                      {colStrengths.map(s => <col key={s} style={{ minWidth: '200px' }} />)}
+                    </colgroup>
+
+                    {/* Column header row — partner's strengths */}
+                    <thead>
+                      <tr>
+                        <th className="border border-gray-200 bg-gray-50 p-3 align-bottom text-left">
+                          <p className="font-semibold text-gray-700 text-xs">{person.name}</p>
+                          <p className="text-gray-400 text-[10px] mt-0.5">↓ rows</p>
+                          <p className="font-semibold text-gray-700 text-xs mt-2">{partner.name}</p>
+                          <p className="text-gray-400 text-[10px] mt-0.5">→ columns</p>
+                        </th>
+                        {colStrengths.map(s => {
+                          const c = getStrengthColors(s)
+                          return (
+                            <th
+                              key={s}
+                              className="border border-gray-200 p-3 text-left align-top font-normal"
+                              style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                            >
+                              <p className="font-bold text-sm mb-1.5">{s}</p>
+                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
+                            </th>
+                          )
+                        })}
+                      </tr>
+                    </thead>
+
+                    {/* Body rows — person's strengths */}
+                    <tbody>
+                      {rowStrengths.map(s => {
+                        const c = getStrengthColors(s)
+                        return (
+                          <tr key={s}>
+                            <th
+                              className="border border-gray-200 p-3 text-left align-top font-normal"
+                              style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
+                            >
+                              <p className="font-bold text-sm mb-1.5">{s}</p>
+                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
+                            </th>
+                            {colStrengths.map(cs => (
+                              <td
+                                key={cs}
+                                className="border border-gray-200 bg-white p-0"
+                                style={{ height: '140px' }}
+                              >
+                                <textarea
+                                  value={cells[cellKey(s, cs)] ?? ''}
+                                  onChange={e => setCells(prev => ({ ...prev, [cellKey(s, cs)]: e.target.value }))}
+                                  placeholder=""
+                                  className="w-full h-full resize-none p-2 text-xs text-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-400"
+                                  style={{ minHeight: '140px' }}
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-xs text-gray-400 mb-8 print:mb-4">
+                  Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.
+                </p>
+
+                {/* Instructions */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 print:mt-8">
+                  <h2 className="text-lg font-bold text-gray-900 mb-1">Power of 2 Worksheet – Instructions</h2>
+                  <p className="text-sm text-gray-500 mb-5">
+                    The Power of 2 worksheet helps paired participants understand how their CliftonStrengths interact in day-to-day work. By examining the intersections of each person's Top 5 strengths, partners identify what they bring to the collaboration and what they need from one another to work effectively.
+                  </p>
+
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">How to Use the Worksheet</h3>
+                  <div className="space-y-5">
+                    {INSTRUCTIONS.map((section, i) => (
+                      <div key={i}>
+                        <p className="text-sm font-semibold text-gray-800 mb-1.5">{i + 1}. {section.title}</p>
+                        <ul className="space-y-1">
+                          {section.body.map((line, j) => (
+                            <li key={j} className="flex gap-2 text-sm text-gray-600">
+                              <span className="text-gray-300 mt-0.5 shrink-0">•</span>
+                              <span>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+
+                  <h3 className="text-sm font-semibold text-gray-700 mt-6 mb-3">Guidelines for Productive Discussion</h3>
+                  <ul className="space-y-1">
+                    {GUIDELINES.map((g, i) => (
+                      <li key={i} className="flex gap-2 text-sm text-gray-600">
+                        <span className="text-gray-300 mt-0.5 shrink-0">•</span>
+                        <span>{g}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         )}
       </main>
