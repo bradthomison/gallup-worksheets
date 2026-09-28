@@ -256,7 +256,7 @@ export default function PowerOf2LMSPage() {
 
                 {/* Worksheet grid */}
                 <div
-                  className="overflow-auto rounded-2xl border border-gray-200 bg-white mb-3"
+                  className="overflow-x-auto rounded-2xl border border-gray-200 bg-white mb-3"
                   style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                 >
                   <table className="w-full border-collapse text-xs" style={{ minWidth: `${180 + colStrengths.length * 200}px` }}>
