@@ -322,6 +322,7 @@ export default function TeamsPage() {
   const [editingId, setEditingId] = useState(null) // team id | 'new' | null
   const [deleteTeamsModal, setDeleteTeamsModal] = useState(false)
   const [search, setSearch] = useState('')
+  const [copiedId, setCopiedId] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -487,12 +488,35 @@ export default function TeamsPage() {
                         </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <button
-                          onClick={() => setEditingId(editingId === team.id ? null : team.id)}
-                          className="text-xs text-brand-500 font-medium hover:underline"
-                        >
-                          {editingId === team.id ? 'Close' : 'Edit'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => {
+                              const url = `${window.location.origin}/team/${team.id}`
+                              navigator.clipboard.writeText(url)
+                              setCopiedId(team.id)
+                              setTimeout(() => setCopiedId(null), 2000)
+                            }}
+                            className="text-xs text-gray-500 hover:text-brand-500 font-medium flex items-center gap-1 transition-colors"
+                          >
+                            {copiedId === team.id ? (
+                              <>
+                                <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>
+                                <span className="text-green-600">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                Share
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setEditingId(editingId === team.id ? null : team.id)}
+                            className="text-xs text-brand-500 font-medium hover:underline"
+                          >
+                            {editingId === team.id ? 'Close' : 'Edit'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                     {/* Inline edit panel */}
