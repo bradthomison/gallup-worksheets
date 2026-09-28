@@ -2,6 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
+import { POWER_OF_2 } from '../data/powerOf2'
 import { getStrengthColors } from './strengthColors'
 
 function hexToRgb(hex) {
@@ -339,6 +340,108 @@ async function buildBringNeedDoc(person) {
 export async function downloadBringNeedPDF(person) {
   const doc = await buildBringNeedDoc(person)
   doc.save(safeName(`${person.name} - Bring - Need.pdf`))
+}
+
+// ── Power of 2 ────────────────────────────────────────────────────────────────
+
+export async function downloadPowerOf2PDF(personA, personB) {
+  const rowStrengths = (personA.top5 ?? []).filter(s => POWER_OF_2[s])
+  const colStrengths = (personB.top5 ?? []).filter(s => POWER_OF_2[s])
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+
+  let headerBottom = 20
+  const logo = await loadLogoDataUrl()
+  const logoH = 44
+  if (logo) {
+    const logoW = (logo.width / logo.height) * logoH
+    doc.addImage(logo.dataUrl, 'PNG', 20, 12, logoW, logoH)
+    headerBottom = 12 + logoH + 6
+  }
+
+  const titleY = 12 + logoH / 2 + 6
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 30, 30)
+  doc.text(`The Power of 2  ·  ${personA.name}  &  ${personB.name}`, pageWidth - 20, titleY, { align: 'right' })
+
+  doc.setDrawColor(220, 220, 220)
+  doc.line(20, headerBottom, pageWidth - 20, headerBottom)
+
+  const startY = headerBottom + 8
+  const usableWidth = pageWidth - 40
+  const labelColW = 148
+  const contentColW = (usableWidth - labelColW) / Math.max(colStrengths.length, 1)
+  const cellPad = 5
+
+  const colHeaderColors = colStrengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
+  const rowHeaderColors = rowStrengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
+
+  const headRow = [
+    `${personA.name}\n(rows)  ×  ${personB.name}\n(columns)`,
+    ...colStrengths.map(s => `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`),
+  ]
+
+  const bodyRows = rowStrengths.map(s => [
+    `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`,
+    ...colStrengths.map(() => ''),
+  ])
+
+  const footerReserved = 30
+  const availableH = pageHeight - startY - footerReserved
+  const headerRowH = 72
+  const bodyRowH = Math.max(60, (availableH - headerRowH) / Math.max(rowStrengths.length, 1))
+
+  const columnStyles = { 0: { cellWidth: labelColW } }
+  for (let i = 1; i <= colStrengths.length; i++) {
+    columnStyles[i] = { cellWidth: contentColW }
+  }
+
+  autoTable(doc, {
+    head: [headRow],
+    body: bodyRows,
+    startY,
+    tableWidth: usableWidth,
+    margin: { left: 20, right: 20 },
+    styles: { fontSize: 7.5, cellPadding: cellPad, valign: 'top', overflow: 'linebreak', lineColor: [210, 210, 210], lineWidth: 0.5 },
+    headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5, valign: 'top', cellPadding: cellPad, minCellHeight: headerRowH },
+    columnStyles,
+    bodyStyles: { textColor: [40, 40, 40], fillColor: [255, 255, 255] },
+    didParseCell(data) {
+      if (data.section === 'head' && data.column.index > 0) {
+        data.cell.styles.fillColor = colHeaderColors[data.column.index - 1] ?? [59, 91, 219]
+        data.cell.styles.textColor = [255, 255, 255]
+        data.cell.styles.fontStyle = 'bold'
+        data.cell.styles.halign = 'center'
+      }
+      if (data.section === 'body' && data.column.index === 0) {
+        data.cell.styles.fillColor = rowHeaderColors[data.row.index] ?? [59, 91, 219]
+        data.cell.styles.textColor = [255, 255, 255]
+        data.cell.styles.fontStyle = 'bold'
+      }
+      if (data.section === 'body') {
+        data.cell.styles.minCellHeight = bodyRowH
+      }
+    },
+  })
+
+  const pageCount = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6)
+    doc.setTextColor(170, 170, 170)
+    doc.setDrawColor(210, 210, 210)
+    doc.line(20, pageHeight - 22, pageWidth - 20, pageHeight - 22)
+    doc.text(
+      'Cascade© 2021 Releasing Strengths Ltd. All rights reserved. Gallup®, CliftonStrengths® and the 34 theme names of CliftonStrengths® are trademarks of Gallup, Inc.',
+      pageWidth / 2, pageHeight - 12, { align: 'center' }
+    )
+  }
+
+  doc.save(safeName(`${personA.name} & ${personB.name} - Power of 2.pdf`))
 }
 
 // ── Base64 getters for email attachment ───────────────────────────────────────
