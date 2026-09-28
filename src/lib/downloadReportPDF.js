@@ -395,7 +395,8 @@ export async function downloadPowerOf2PDF(personA, personB) {
   // then find the largest font that fits everything on one page.
   function measureHeights(fs) {
     doc.setFontSize(fs)
-    doc.setFont('helvetica', 'normal')
+    // All measured cells render bold (headStyles + body col-0 override), so measure bold
+    doc.setFont('helvetica', 'bold')
     const lh = fs * doc.getLineHeightFactor()
     const contentInnerW = contentColW - 2 * cellPad
     const labelInnerW = labelColW - 2 * cellPad

@@ -121,6 +121,22 @@ export default function PowerOf2LMSPage() {
 
   function cellKey(row, col) { return `${row}||${col}` }
 
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      @media print {
+        @page { size: landscape; margin: 1cm; }
+        body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        .po2-table { min-width: 0 !important; width: 100% !important; }
+        .po2-table col { min-width: 0 !important; width: auto !important; }
+        .po2-cell { height: auto !important; }
+        .po2-textarea { height: 70pt !important; min-height: 70pt !important; }
+      }
+    `
+    document.head.appendChild(style)
+    return () => { if (document.head.contains(style)) document.head.removeChild(style) }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200">
@@ -259,7 +275,7 @@ export default function PowerOf2LMSPage() {
                   className="rounded-2xl border border-gray-200 bg-white mb-3"
                   style={{ overflowX: 'auto', overflowY: 'hidden', printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                 >
-                  <table className="w-full border-collapse text-xs" style={{ minWidth: `${180 + colStrengths.length * 200}px` }}>
+                  <table className="po2-table w-full border-collapse text-xs" style={{ minWidth: `${180 + colStrengths.length * 200}px` }}>
                     <colgroup>
                       <col style={{ width: '180px' }} />
                       {colStrengths.map(s => <col key={s} style={{ minWidth: '200px' }} />)}
@@ -308,14 +324,14 @@ export default function PowerOf2LMSPage() {
                             {colStrengths.map(cs => (
                               <td
                                 key={cs}
-                                className="border border-gray-200 bg-white p-0"
+                                className="po2-cell border border-gray-200 bg-white p-0"
                                 style={{ height: '140px' }}
                               >
                                 <textarea
                                   value={cells[cellKey(s, cs)] ?? ''}
                                   onChange={e => setCells(prev => ({ ...prev, [cellKey(s, cs)]: e.target.value }))}
                                   placeholder=""
-                                  className="w-full h-full resize-none p-2 text-xs text-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-400"
+                                  className="po2-textarea w-full h-full resize-none p-2 text-xs text-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-400"
                                   style={{ minHeight: '140px' }}
                                 />
                               </td>
