@@ -445,7 +445,8 @@ async function savePairGridPDF({ title, corner, rowStrengths, colStrengths, rowT
     body: bodyRows,
     startY,
     tableWidth: usableWidth,
-    margin: { left: 20, right: 20 },
+    // autoTable keeps a 40pt bottom margin by default; match the space reserved for the footer
+    margin: { left: 20, right: 20, top: 20, bottom: footerReserved },
     styles: { fontSize: fs, cellPadding: cellPad, valign: 'top', overflow: 'linebreak', lineColor: [210, 210, 210], lineWidth: 0.5 },
     headStyles: { fillColor: [59, 91, 219], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fs, valign: 'top', cellPadding: cellPad, minCellHeight: headH },
     columnStyles,
