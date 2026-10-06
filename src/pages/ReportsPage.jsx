@@ -1,9 +1,11 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
+import ReportContentByStrength from '../components/ReportContentByStrength'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
-import { POWER_OF_2 } from '../data/powerOf2'
+import { P2_VARIANTS, P2_VARIANT_ORDER, P2_DEFAULTS, p2Path } from '../data/powerOf2'
+import { loadPowerOfMeContent } from '../lib/powerOf2Content'
 
 const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS).sort()
 
@@ -26,12 +28,10 @@ const BRING_NEED_FIELD_LABELS = {
   need:  'I Need (My Energizers)',
 }
 
-const POWER_OF_2_FIELD_LABELS = {
-  bring: 'I Bring…',
-  need:  'I Need…',
-}
-
-function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD_LABELS }) {
+// refreshKey changes when content is saved elsewhere on the page (reload without a loading flash);
+// onSaved tells the page this editor saved something.
+function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD_LABELS, refreshKey, onSaved }) {
+  const loadedOnce = useRef(false)
   const [selectedStrength, setSelectedStrength] = useState('Activator')
   const [dbContent, setDbContent] = useState({})
   const [editFields, setEditFields] = useState({})
@@ -41,7 +41,7 @@ function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD
   const [tableExists, setTableExists] = useState(true)
 
   const loadContent = useCallback(async () => {
-    setLoading(true)
+    if (!loadedOnce.current) setLoading(true)
     try {
       const { data, error } = await supabase
         .from('report_content')
@@ -57,8 +57,9 @@ function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD
       })
       setDbContent(merged)
     } catch { setTableExists(false) }
+    loadedOnce.current = true
     setLoading(false)
-  }, [reportType, staticFallback])
+  }, [reportType, staticFallback, refreshKey])
 
   useEffect(() => { loadContent() }, [loadContent])
 
@@ -80,6 +81,7 @@ function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD
       setDbContent(prev => ({ ...prev, [selectedStrength]: { ...editFields } }))
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+      onSaved?.()
     }
   }
 
@@ -151,7 +153,8 @@ function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD
   )
 }
 
-function CustomStrengthContentEditor({ reportType, rows }) {
+function CustomStrengthContentEditor({ reportType, rows, refreshKey, onSaved }) {
+  const loadedOnce = useRef(false)
   const [selectedStrength, setSelectedStrength] = useState('Activator')
   const [dbContent, setDbContent] = useState({})
   const [editFields, setEditFields] = useState({})
@@ -161,7 +164,7 @@ function CustomStrengthContentEditor({ reportType, rows }) {
 
   const loadContent = useCallback(async () => {
     if (rows.length === 0) return
-    setLoading(true)
+    if (!loadedOnce.current) setLoading(true)
     const { data } = await supabase
       .from('report_content')
       .select('strength_name, content')
@@ -172,8 +175,9 @@ function CustomStrengthContentEditor({ reportType, rows }) {
       merged[s] = row?.content ?? {}
     })
     setDbContent(merged)
+    loadedOnce.current = true
     setLoading(false)
-  }, [reportType, rows])
+  }, [reportType, rows, refreshKey])
 
   useEffect(() => { loadContent() }, [loadContent])
 
@@ -195,6 +199,7 @@ function CustomStrengthContentEditor({ reportType, rows }) {
       setDbContent(prev => ({ ...prev, [selectedStrength]: { ...editFields } }))
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
+      onSaved?.()
     }
   }
 
@@ -254,7 +259,7 @@ function CustomStrengthContentEditor({ reportType, rows }) {
   )
 }
 
-function PersonalInsightsReport() {
+function PersonalInsightsReport({ refreshKey, onContentSaved }) {
   const [expanded, setExpanded] = useState(false)
   const [lmsCopied, setLmsCopied] = useState(false)
 
@@ -307,14 +312,14 @@ function PersonalInsightsReport() {
               {lmsCopied ? '✓ Copied' : 'Copy Link'}
             </button>
           </div>
-          <StrengthContentEditor reportType="personal_insights" staticFallback={PERSONAL_INSIGHTS} />
+          <StrengthContentEditor reportType="personal_insights" staticFallback={PERSONAL_INSIGHTS} refreshKey={refreshKey} onSaved={onContentSaved} />
         </div>
       )}
     </div>
   )
 }
 
-function BringNeedReport() {
+function BringNeedReport({ refreshKey, onContentSaved }) {
   const [expanded, setExpanded] = useState(false)
   const [lmsCopied, setLmsCopied] = useState(false)
 
@@ -367,25 +372,167 @@ function BringNeedReport() {
               {lmsCopied ? '✓ Copied' : 'Copy Link'}
             </button>
           </div>
-          <StrengthContentEditor reportType="bring_need" staticFallback={BRING_NEED} fieldLabels={BRING_NEED_FIELD_LABELS} />
+          <StrengthContentEditor reportType="bring_need" staticFallback={BRING_NEED} fieldLabels={BRING_NEED_FIELD_LABELS} refreshKey={refreshKey} onSaved={onContentSaved} />
         </div>
       )}
     </div>
   )
 }
 
-function PowerOf2Report() {
-  const [expanded, setExpanded] = useState(false)
-  const [lmsCopied, setLmsCopied] = useState(false)
+function CopyLinkRow({ label, url, active, onEdit }) {
+  const [copied, setCopied] = useState(false)
 
-  const lmsUrl = `${window.location.origin}/power-of-2`
-
-  function copyLmsLink() {
-    navigator.clipboard.writeText(lmsUrl).then(() => {
-      setLmsCopied(true)
-      setTimeout(() => setLmsCopied(false), 2000)
+  function copy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     })
   }
+
+  return (
+    <div className={`flex items-center justify-between bg-white border rounded-lg px-4 py-3 ${active ? 'border-brand-300 ring-1 ring-brand-200' : 'border-gray-200'}`}>
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-gray-500 mb-0.5">{label}</p>
+        <p className="text-xs text-brand-500 truncate">{url}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0 ml-4">
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className={`text-xs font-medium border px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${active ? 'text-brand-600 border-brand-200 bg-brand-50' : 'text-gray-500 hover:text-gray-800 border-gray-200 bg-gray-50 hover:bg-gray-100'}`}
+          >
+            {active ? 'Editing' : 'Edit text'}
+          </button>
+        )}
+        <button
+          onClick={copy}
+          className="text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+        >
+          {copied ? '✓ Copied' : 'Copy Link'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// The Power of Me reuses two of the Power of 2 texts: The Role I Play (column headers) and
+// Descriptive Words (row headers). This editor shows just those two boxes per strength.
+const POM_FIELDS = [
+  { id: 'role',  reportType: P2_VARIANTS.role.reportType,                 key: 'roleIPlay',        label: 'The Role I Play (column headers)' },
+  { id: 'words', reportType: P2_VARIANTS['descriptive-words'].reportType, key: 'descriptiveWords', label: 'Descriptive Words (row headers)' },
+]
+const POM_DEFAULTS = { role: P2_DEFAULTS.role, words: P2_DEFAULTS['descriptive-words'] }
+
+function PowerOfMeEditor({ refreshKey, onSaved: onContentSaved }) {
+  const [selectedStrength, setSelectedStrength] = useState('Activator')
+  const [saved, setSaved] = useState(null) // { role: {strength: {roleIPlay}}, words: {...} }
+  const [editFields, setEditFields] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => { loadPowerOfMeContent().then(setSaved) }, [refreshKey])
+
+  useEffect(() => {
+    if (!saved) return
+    const next = {}
+    POM_FIELDS.forEach(f => { next[f.id] = saved[f.id][selectedStrength]?.[f.key] ?? '' })
+    setEditFields(next)
+    setJustSaved(false)
+    setError(null)
+  }, [selectedStrength, saved])
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase.from('report_content').upsert(
+      POM_FIELDS.map(f => ({
+        report_type: f.reportType,
+        strength_name: selectedStrength,
+        content: { [f.key]: editFields[f.id] ?? '' },
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'report_type,strength_name' }
+    )
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setSaved(prev => {
+      const next = { ...prev }
+      POM_FIELDS.forEach(f => {
+        next[f.id] = { ...prev[f.id], [selectedStrength]: { ...prev[f.id][selectedStrength], [f.key]: editFields[f.id] ?? '' } }
+      })
+      return next
+    })
+    setJustSaved(true)
+    setTimeout(() => setJustSaved(false), 2500)
+    onContentSaved?.()
+  }
+
+  function handleReset() {
+    const next = {}
+    POM_FIELDS.forEach(f => { next[f.id] = POM_DEFAULTS[f.id][selectedStrength]?.[f.key] ?? '' })
+    setEditFields(next)
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <p className="text-sm font-semibold text-gray-800">Edit Strength Content</p>
+        <p className="text-xs text-gray-400 mt-0.5">
+          These are the same texts used by the Power of 2 "The Role I Play" and "Descriptive Words" versions, so edits carry over to both.
+        </p>
+      </div>
+      {!saved ? (
+        <p className="text-sm text-gray-400 px-4 py-6">Loading…</p>
+      ) : (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select strength:</label>
+            <select
+              value={selectedStrength}
+              onChange={e => setSelectedStrength(e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+            >
+              {ALL_STRENGTHS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="space-y-3">
+            {POM_FIELDS.map(f => (
+              <div key={f.id}>
+                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+                <textarea
+                  value={editFields[f.id] ?? ''}
+                  onChange={e => setEditFields(prev => ({ ...prev, [f.id]: e.target.value }))}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+            >
+              {saving ? 'Saving…' : `Save ${selectedStrength}`}
+            </button>
+            <button onClick={handleReset} className="text-sm text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg transition-colors">
+              Reset to default
+            </button>
+            {justSaved && <span className="text-sm text-green-600">✓ Saved</span>}
+            {error && <span className="text-sm text-red-600">{error}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PowerOf2Report({ refreshKey, onContentSaved }) {
+  const [expanded, setExpanded] = useState(false)
+  const [variant, setVariant] = useState('bring-need') // a Power of 2 variant, or 'power-of-me'
+  const editingMe = variant === 'power-of-me'
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -401,10 +548,10 @@ function PowerOf2Report() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
           <div>
-            <p className="font-semibold text-gray-900">The Power of 2</p>
+            <p className="font-semibold text-gray-900">Power of 2 and Power of Me</p>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
-                34 strengths · I Bring / I Need
+                34 strengths · 5 versions
               </span>
               <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                 Built-in
@@ -415,26 +562,45 @@ function PowerOf2Report() {
       </div>
       {expanded && (
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
-          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
-              <p className="text-xs text-brand-500 truncate">{lmsUrl}</p>
-            </div>
-            <button
-              onClick={copyLmsLink}
-              className="shrink-0 ml-4 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-            >
-              {lmsCopied ? '✓ Copied' : 'Copy Link'}
-            </button>
+          <div className="space-y-2">
+            {P2_VARIANT_ORDER.map(v => (
+              <CopyLinkRow
+                key={v}
+                label={`Acorn Course Link · The Power of 2 · ${P2_VARIANTS[v].label}`}
+                url={`${window.location.origin}${p2Path(v)}`}
+                active={v === variant}
+                onEdit={() => setVariant(v)}
+              />
+            ))}
+            <CopyLinkRow
+              label="Acorn Course Link · The Power of Me"
+              url={`${window.location.origin}/power-of-me`}
+              active={editingMe}
+              onEdit={() => setVariant('power-of-me')}
+            />
           </div>
-          <StrengthContentEditor reportType="power_of_2" staticFallback={POWER_OF_2} fieldLabels={POWER_OF_2_FIELD_LABELS} />
+          <p className="text-xs text-gray-500">
+            Editing: <span className="font-semibold text-gray-700">{editingMe ? 'The Power of Me' : P2_VARIANTS[variant].label}</span>
+          </p>
+          {editingMe ? (
+            <PowerOfMeEditor refreshKey={refreshKey} onSaved={onContentSaved} />
+          ) : (
+            <StrengthContentEditor
+              key={variant}
+              reportType={P2_VARIANTS[variant].reportType}
+              staticFallback={P2_DEFAULTS[variant]}
+              fieldLabels={P2_VARIANTS[variant].fieldLabels}
+              refreshKey={refreshKey}
+              onSaved={onContentSaved}
+            />
+          )}
         </div>
       )}
     </div>
   )
 }
 
-function CustomReportCard({ report: initialReport, onDelete }) {
+function CustomReportCard({ report: initialReport, onDelete, onUpdate, refreshKey, onContentSaved }) {
   const [report, setReport] = useState(initialReport)
   const [expanded, setExpanded] = useState(false)
   const [lmsCopied, setLmsCopied] = useState(false)
@@ -483,7 +649,7 @@ function CustomReportCard({ report: initialReport, onDelete }) {
       .select()
       .single()
     setRowsSaving(false)
-    if (data) setReport(data)
+    if (data) { setReport(data); onUpdate?.(data) }
     setEditingRows(false)
   }
 
@@ -497,7 +663,7 @@ function CustomReportCard({ report: initialReport, onDelete }) {
       .select()
       .single()
     setNameSaving(false)
-    if (data) setReport(data)
+    if (data) { setReport(data); onUpdate?.(data) }
     setEditingName(false)
   }
 
@@ -637,7 +803,7 @@ function CustomReportCard({ report: initialReport, onDelete }) {
             )}
           </div>
 
-          <CustomStrengthContentEditor reportType={report.id} rows={rows} />
+          <CustomStrengthContentEditor reportType={report.id} rows={rows} refreshKey={refreshKey} onSaved={onContentSaved} />
         </div>
       )}
     </div>
@@ -646,6 +812,7 @@ function CustomReportCard({ report: initialReport, onDelete }) {
 
 export default function ReportsPage() {
   const [reports, setReports] = useState([])
+  const [contentVersion, setContentVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addingNew, setAddingNew] = useState(false)
   const [newName, setNewName] = useState('')
@@ -675,6 +842,13 @@ export default function ReportsPage() {
     setAddingNew(false)
     setNewName('')
     load()
+  }
+
+  // Any content save bumps this so every editor on the page (and the by-strength list) reloads
+  const bumpContent = useCallback(() => setContentVersion(v => v + 1), [])
+
+  function handleReportUpdated(updated) {
+    setReports(rs => rs.map(r => (r.id === updated.id ? updated : r)))
   }
 
   async function handleDelete(id) {
@@ -734,13 +908,31 @@ export default function ReportsPage() {
         <p className="text-gray-500 text-sm">Loading…</p>
       ) : (
         <div className="space-y-3">
-          <PersonalInsightsReport />
-          <BringNeedReport />
-          <PowerOf2Report />
+          <PersonalInsightsReport refreshKey={contentVersion} onContentSaved={bumpContent} />
+          <BringNeedReport refreshKey={contentVersion} onContentSaved={bumpContent} />
+          <PowerOf2Report refreshKey={contentVersion} onContentSaved={bumpContent} />
           {reports.map(r => (
-            <CustomReportCard key={r.id} report={r} onDelete={handleDelete} />
+            <CustomReportCard
+              key={r.id}
+              report={r}
+              onDelete={handleDelete}
+              onUpdate={handleReportUpdated}
+              refreshKey={contentVersion}
+              onContentSaved={bumpContent}
+            />
           ))}
         </div>
+      )}
+
+      {!loading && (
+        <section className="mt-12">
+          <h2 className="text-xl font-bold text-gray-900">Edit Report Content by Strength</h2>
+          <p className="text-sm text-gray-500 mt-1 mb-5">
+            See and edit the text each report shows for a strength, all in one place. Open a strength, then open a report to edit it.
+            New custom reports appear here automatically.
+          </p>
+          <ReportContentByStrength customReports={reports} refreshKey={contentVersion} onSaved={bumpContent} />
+        </section>
       )}
     </Layout>
   )

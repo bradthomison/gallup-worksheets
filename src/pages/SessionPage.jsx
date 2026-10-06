@@ -8,6 +8,8 @@ import ResponseViewerModal from '../components/ResponseViewerModal'
 import { parseParticipants } from '../lib/parseParticipants'
 import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
 import { formatDateLong } from '../lib/dateUtils'
+import { sessionReportInfo } from '../lib/sessionReports'
+import PromptInputs, { padPrompts } from '../components/PromptInputs'
 
 // ── Group Access Link card with QR code ───────────────────────────────────────
 function GroupAccessLinkCard({ joinUrl, sessionTitle }) {
@@ -105,7 +107,7 @@ export default function SessionPage() {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState('')
   const [editDate, setEditDate] = useState('')
-  const [editPromptsText, setEditPromptsText] = useState('')
+  const [editPromptBoxes, setEditPromptBoxes] = useState(() => padPrompts([]))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
@@ -141,7 +143,7 @@ export default function SessionPage() {
   function startEditing() {
     setEditTitle(session.title)
     setEditDate(session.date ?? '')
-    setEditPromptsText((session.prompts ?? []).join('\n'))
+    setEditPromptBoxes(padPrompts(session.prompts))
     setRemovedIds(new Set())
     setAddSelected(new Set())
     setPasteText('')
@@ -213,7 +215,8 @@ export default function SessionPage() {
   }
 
   async function handleSave() {
-    const prompts = editPromptsText.split('\n').map(s => s.trim()).filter(Boolean)
+    // Built-in report / team overview sessions keep their prompt marker; only ordinary prompts are edited
+    const prompts = isReportPrompts(session?.prompts) ? (session.prompts ?? []) : editPromptBoxes.map(s => s.trim()).filter(Boolean)
     if (!editTitle.trim()) { setSaveError('Title is required.'); return }
     if (prompts.length === 0) { setSaveError('Add at least one prompt.'); return }
     if (pasteErrors.length > 0) { setSaveError('Fix paste errors before saving.'); return }
@@ -742,18 +745,16 @@ export default function SessionPage() {
         </h2>
         {editing ? (
           <div className="space-y-2">
-            <textarea
-              value={editPromptsText}
-              onChange={e => setEditPromptsText(e.target.value)}
-              rows={8}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
-            />
-            <p className="text-xs text-gray-400">One prompt per line.</p>
+            {isReportPrompts(session.prompts) ? (
+              <p className="text-sm text-gray-500">This session uses a built-in report, so it has no prompts to edit.</p>
+            ) : (
+              <PromptInputs prompts={editPromptBoxes} onChange={setEditPromptBoxes} />
+            )}
           </div>
         ) : (
           <ol className="space-y-1.5 list-decimal list-inside">
             {(session.prompts ?? []).map((p, i) => (
-              <li key={i} className="text-sm text-gray-700">{p}</li>
+              <li key={i} className="text-sm text-gray-700">{sessionReportInfo(p)?.name ?? p}</li>
             ))}
           </ol>
         )}

@@ -1,16 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import StrengthBadge from '../components/StrengthBadge'
 import { getStrengthColors } from '../lib/strengthColors'
 import { getWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
 import SiteFooter from '../components/SiteFooter'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
+import { sessionReportInfo } from '../lib/sessionReports'
+import { p2Path } from '../data/powerOf2'
 
 const PI_SENTINEL = '__personal_insights__'
 
 export default function WorksheetPage() {
   const { slug } = useParams()
+  const navigate = useNavigate()
+  const [teamMissing, setTeamMissing] = useState(false)
   const [participant, setParticipant] = useState(null)
   const [session, setSession] = useState(null)
   const [cells, setCells] = useState({}) // { "promptIdx_strengthIdx": text }
@@ -55,6 +59,24 @@ export default function WorksheetPage() {
     }
     load()
   }, [slug])
+
+  // Team overview / Power of 2 / Power of Me sessions send the participant to that page instead.
+  useEffect(() => {
+    if (!participant || !session) return
+    const info = sessionReportInfo((session.prompts ?? [])[0])
+    if (!info || info.kind === 'pi') return
+    const email = encodeURIComponent(participant.email ?? '')
+    if (info.kind === 'pom') { navigate(`/power-of-me?email=${email}`, { replace: true }); return }
+    supabase.rpc('get_personal_insights_by_email', { p_email: (participant.email ?? '').trim().toLowerCase() }).then(({ data }) => {
+      const teamId = data?.team_id
+      if (info.kind === 'team') {
+        if (teamId) navigate(`/team/${teamId}?email=${email}`, { replace: true })
+        else setTeamMissing(true)
+      } else {
+        navigate(`${p2Path(info.variant)}?email=${email}${teamId ? `&teamId=${teamId}` : ''}`, { replace: true })
+      }
+    })
+  }, [participant, session])
 
   function handleCellChange(promptIdx, strengthIdx, value) {
     setCells(prev => ({ ...prev, [`${promptIdx}_${strengthIdx}`]: value }))
@@ -167,6 +189,15 @@ export default function WorksheetPage() {
     <div className="flex items-center justify-center min-h-screen text-red-500 text-sm">{error}</div>
   )
   if (!participant || !session) return null
+
+  const reportInfo = sessionReportInfo((session.prompts ?? [])[0])
+  if (reportInfo && reportInfo.kind !== 'pi') return (
+    <div className="flex items-center justify-center min-h-screen px-4 text-center text-sm text-gray-500">
+      {teamMissing
+        ? "You haven't been added to a team yet. Please contact your coach."
+        : 'Loading…'}
+    </div>
+  )
 
   const isPersonalInsights = (session.prompts ?? [])[0] === PI_SENTINEL
   const prompts = session.prompts ?? []

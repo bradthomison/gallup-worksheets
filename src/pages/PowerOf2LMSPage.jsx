@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { POWER_OF_2 } from '../data/powerOf2'
+import { P2_DEFAULTS, P2_VARIANTS, p2Variant, p2HeaderLines } from '../data/powerOf2'
+import { loadP2Content } from '../lib/powerOf2Content'
 import { getStrengthColors } from '../lib/strengthColors'
 import { downloadPowerOf2PDF } from '../lib/downloadReportPDF'
 import SiteFooter from '../components/SiteFooter'
@@ -44,14 +45,38 @@ const INSTRUCTIONS = [
   },
 ]
 
+// The printed worksheet wording refers to "I bring… / I need…"; other variants swap those lines.
+function instructionsFor(variant) {
+  if (variant === 'bring-need') return INSTRUCTIONS
+  const label = P2_VARIANTS[variant].label
+  return INSTRUCTIONS.map(section => ({
+    ...section,
+    body: section.body.map(line => {
+      if (line.startsWith('Each box includes two prompts')) return `Each strength header shows its ${label.toLowerCase()} to guide the conversation.`
+      if (line.startsWith('Complete the box with')) return 'Complete the box with what you notice when these two strengths work together: where they reinforce each other and what each one needs from the other.'
+      return line
+    }),
+  }))
+}
+
 const GUIDELINES = [
   'There are no "good" or "bad" strengths — only strengths used intentionally or unintentionally.',
   '"I need…" statements are not demands; they clarify how to work well together.',
   'Approach the conversation with curiosity and shared accountability.',
 ]
 
+function HeaderText({ variant, content }) {
+  return p2HeaderLines(variant, content).map((l, i) => (
+    <p key={i} className={`text-[11px] leading-snug opacity-90 ${i > 0 ? 'mt-1' : ''}`}>
+      {l.label && <span className="font-semibold">{l.label} </span>}{l.text}
+    </p>
+  ))
+}
+
 export default function PowerOf2LMSPage() {
   const [searchParams] = useSearchParams()
+  const variant = p2Variant(useParams().variant)
+  const variantLabel = P2_VARIANTS[variant].label
   const emailParam = searchParams.get('email')
   const teamIdParam = searchParams.get('teamId')
 
@@ -64,7 +89,7 @@ export default function PowerOf2LMSPage() {
   const [partner, setPartner] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [cells, setCells] = useState({})
-  const [content, setContent] = useState(POWER_OF_2)
+  const [content, setContent] = useState(P2_DEFAULTS[variant])
 
   async function loadData(emailVal, teamId) {
     setLoading(true)
@@ -118,19 +143,12 @@ export default function PowerOf2LMSPage() {
   }, [])
 
   useEffect(() => {
-    supabase
-      .from('report_content')
-      .select('strength_name, content')
-      .eq('report_type', 'power_of_2')
-      .then(({ data }) => {
-        const merged = { ...POWER_OF_2 }
-        ;(data ?? []).forEach(r => { if (r.content) merged[r.strength_name] = { ...merged[r.strength_name], ...r.content } })
-        setContent(merged)
-      })
-  }, [])
+    setContent(P2_DEFAULTS[variant])
+    loadP2Content(variant).then(setContent)
+  }, [variant])
 
-  const rowStrengths = (person?.top5 ?? []).filter(s => POWER_OF_2[s])
-  const colStrengths = (partner?.top5 ?? []).filter(s => POWER_OF_2[s])
+  const rowStrengths = (person?.top5 ?? []).filter(s => content[s])
+  const colStrengths = (partner?.top5 ?? []).filter(s => content[s])
 
   function cellKey(row, col) { return `${row}||${col}` }
 
@@ -173,7 +191,7 @@ export default function PowerOf2LMSPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
+                <h1 className="text-2xl font-bold text-gray-900">The Power of 2{variant !== 'bring-need' && <span className="text-gray-400 font-medium"> · {variantLabel}</span>}</h1>
                 <p className="text-sm text-gray-500 mt-1">
                   Enter the email address your coach has on file to get started.
                 </p>
@@ -211,7 +229,7 @@ export default function PowerOf2LMSPage() {
             <div className="flex items-start justify-between mb-6 flex-wrap gap-4 print:hidden">
               <div>
                 <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-0.5">{teamName}</p>
-                <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
+                <h1 className="text-2xl font-bold text-gray-900">The Power of 2{variant !== 'bring-need' && <span className="text-gray-400 font-medium"> · {variantLabel}</span>}</h1>
                 <p className="text-gray-500 text-sm mt-0.5">Hi {person.name.split(' ')[0]}! Select a partner below to begin.</p>
               </div>
               <div className="flex items-center gap-2">
@@ -219,7 +237,7 @@ export default function PowerOf2LMSPage() {
                   onClick={async () => {
                     if (!partner) return
                     setPdfLoading(true)
-                    await downloadPowerOf2PDF(person, partner, content)
+                    await downloadPowerOf2PDF(person, partner, content, variant)
                     setPdfLoading(false)
                   }}
                   disabled={pdfLoading || !partner}
@@ -279,7 +297,7 @@ export default function PowerOf2LMSPage() {
               <>
                 {/* Print-only header */}
                 <div className="hidden print:block mb-4">
-                  <h1 className="text-2xl font-bold text-gray-900">The Power of 2</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">The Power of 2{variant !== 'bring-need' && <span className="text-gray-400 font-medium"> · {variantLabel}</span>}</h1>
                   <p className="text-gray-600 text-sm mt-0.5">{person.name} &amp; {partner.name}</p>
                 </div>
 
@@ -312,8 +330,7 @@ export default function PowerOf2LMSPage() {
                               style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                             >
                               <p className="font-bold text-sm mb-1.5">{s}</p>
-                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {content[s]?.bring ?? ''}</p>
-                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {content[s]?.need ?? ''}</p>
+                              <HeaderText variant={variant} content={content[s]} />
                             </th>
                           )
                         })}
@@ -331,8 +348,7 @@ export default function PowerOf2LMSPage() {
                               style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                             >
                               <p className="font-bold text-sm mb-1.5">{s}</p>
-                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {content[s]?.bring ?? ''}</p>
-                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {content[s]?.need ?? ''}</p>
+                              <HeaderText variant={variant} content={content[s]} />
                             </th>
                             {colStrengths.map(cs => (
                               <td
@@ -372,7 +388,7 @@ export default function PowerOf2LMSPage() {
 
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">How to Use the Worksheet</h3>
                   <div className="space-y-5">
-                    {INSTRUCTIONS.map((section, i) => (
+                    {instructionsFor(variant).map((section, i) => (
                       <div key={i}>
                         <p className="text-sm font-semibold text-gray-800 mb-1.5">{i + 1}. {section.title}</p>
                         <ul className="space-y-1">
@@ -389,7 +405,7 @@ export default function PowerOf2LMSPage() {
 
                   <h3 className="text-sm font-semibold text-gray-700 mt-6 mb-3">Guidelines for Productive Discussion</h3>
                   <ul className="space-y-1">
-                    {GUIDELINES.map((g, i) => (
+                    {GUIDELINES.filter(g => variant === 'bring-need' || !g.startsWith('"I need')).map((g, i) => (
                       <li key={i} className="flex gap-2 text-sm text-gray-600">
                         <span className="text-gray-300 mt-0.5 shrink-0">•</span>
                         <span>{g}</span>

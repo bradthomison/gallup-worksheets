@@ -289,7 +289,7 @@ export default function LMSLearnersPage() {
       ) : groups.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border border-gray-200">
           <p className="text-gray-500 mb-1">No LMS worksheets yet.</p>
-          <p className="text-sm text-gray-400">Share an Acorn Course Link from the Themes page to get started.</p>
+          <p className="text-sm text-gray-400">Share an Acorn Course Link from the Session Topics page to get started.</p>
         </div>
       ) : (
         <div className="space-y-3">

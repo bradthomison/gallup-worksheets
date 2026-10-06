@@ -470,7 +470,13 @@ export default function TeamsPage() {
                   <>
                     <tr key={team.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{team.name}</p>
+                        <a
+                          href={`/team/${team.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open team page"
+                          className="font-medium text-gray-900 hover:text-brand-600 hover:underline"
+                        >{team.name}</a>
                       </td>
                       <td className="px-4 py-3 text-gray-500">{team.location || <span className="text-gray-300">—</span>}</td>
                       <td className="px-4 py-3 text-gray-500">{team.primary_coach || <span className="text-gray-300">—</span>}</td>

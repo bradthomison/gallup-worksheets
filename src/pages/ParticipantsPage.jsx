@@ -6,7 +6,9 @@ import StrengthBadge from '../components/StrengthBadge'
 import { STRENGTH_DOMAIN, getStrengthColors } from '../lib/strengthColors'
 import { parseParticipants } from '../lib/parseParticipants'
 import { getWorksheetPDFBlob, getBlankWorksheetPDFBlob } from '../lib/downloadWorksheetPDF'
-import { downloadPersonalInsightsPDF, downloadCustomReportPDF, downloadBringNeedPDF } from '../lib/downloadReportPDF'
+import { downloadPersonalInsightsPDF, downloadCustomReportPDF, downloadBringNeedPDF, downloadPowerOfMePDF } from '../lib/downloadReportPDF'
+import { P2_VARIANTS, P2_VARIANT_ORDER, p2Path } from '../data/powerOf2'
+import { loadPowerOfMeContent } from '../lib/powerOf2Content'
 import { formatDateShort } from '../lib/dateUtils'
 import ResponseViewerModal from '../components/ResponseViewerModal'
 import PersonalInsightsModal, { buildPersonalInsightsPrintHTML } from '../components/PersonalInsightsModal'
@@ -356,9 +358,12 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
   const [pdfLoading, setPdfLoading] = useState({})
   const [copied, setCopied] = useState({})
   const [sendLoading, setSendLoading] = useState({})
+  const [p2Variant, setP2Variant] = useState('bring-need')
 
   const piUrl = `${window.location.origin}/personal-insights?email=${encodeURIComponent(person.email ?? '')}`
   const bnUrl = `${window.location.origin}/bring-need?email=${encodeURIComponent(person.email ?? '')}`
+  const p2Url = `${window.location.origin}${p2Path(p2Variant)}?email=${encodeURIComponent(person.email ?? '')}${person.team_id ? `&teamId=${person.team_id}` : ''}`
+  const pomUrl = `${window.location.origin}/power-of-me?email=${encodeURIComponent(person.email ?? '')}`
 
   function openPrintWindow(html) {
     const win = window.open('', '_blank')
@@ -378,6 +383,12 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
     setPdfLoading(p => ({ ...p, bn: true }))
     await downloadBringNeedPDF(person)
     setPdfLoading(p => ({ ...p, bn: false }))
+  }
+
+  async function handlePomPdf() {
+    setPdfLoading(p => ({ ...p, pom: true }))
+    await downloadPowerOfMePDF(person, await loadPowerOfMeContent())
+    setPdfLoading(p => ({ ...p, pom: false }))
   }
 
   async function handleCustomPdf(report) {
@@ -468,6 +479,54 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
               </button>
               <button onClick={() => sendLink(bnUrl, 'Bring - Need', 'bn')} disabled={sendLoading['bn']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
                 {sendLoading['bn'] ? '…' : 'Send Link'}
+              </button>
+            </div>
+          </div>
+
+          {/* The Power of 2 */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Built-in</span>
+              <span className="text-sm text-gray-700 truncate">The Power of 2</span>
+              <select
+                value={p2Variant}
+                onChange={e => setP2Variant(e.target.value)}
+                className="text-xs rounded-md border border-gray-300 bg-white px-2 py-1 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                title="Choose which Power of 2 to open"
+              >
+                {P2_VARIANT_ORDER.map(v => <option key={v} value={v}>{P2_VARIANTS[v].label}</option>)}
+              </select>
+              {!person.team_id && (
+                <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">Needs a team</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+              <button onClick={() => window.open(p2Url, '_blank', 'noopener')} className={actionBtnBrand}>Open</button>
+              <button onClick={() => copyLink('p2', p2Url)} className={`pl-2.5 ${actionBtn}`}>
+                {copied['p2'] ? '✓ Copied' : 'Copy Link'}
+              </button>
+              <button onClick={() => sendLink(p2Url, `The Power of 2 (${P2_VARIANTS[p2Variant].label})`, 'p2')} disabled={sendLoading['p2']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {sendLoading['p2'] ? '…' : 'Send Link'}
+              </button>
+            </div>
+          </div>
+
+          {/* The Power of Me */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Built-in</span>
+              <span className="text-sm text-gray-700 truncate">The Power of Me</span>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+              <button onClick={() => window.open(pomUrl, '_blank', 'noopener')} className={actionBtnBrand}>Open</button>
+              <button onClick={handlePomPdf} disabled={pdfLoading['pom']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {pdfLoading['pom'] ? '…' : '↓ PDF'}
+              </button>
+              <button onClick={() => copyLink('pom', pomUrl)} className={`pl-2.5 ${actionBtn}`}>
+                {copied['pom'] ? '✓ Copied' : 'Copy Link'}
+              </button>
+              <button onClick={() => sendLink(pomUrl, 'The Power of Me', 'pom')} disabled={sendLoading['pom']} className={`pl-2.5 ${actionBtn} disabled:opacity-50`}>
+                {sendLoading['pom'] ? '…' : 'Send Link'}
               </button>
             </div>
           </div>
@@ -779,7 +838,7 @@ function PersonWorksheetPanel({ person, onClose }) {
                     <div key={ws.id} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${status.color}`}>{status.label}</span>
-                        <span className="text-sm text-gray-700 truncate">{ws.theme?.name ?? 'Unknown theme'}</span>
+                        <span className="text-sm text-gray-700 truncate">{ws.theme?.name ?? 'Unknown session topic'}</span>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
                         {status.label === 'Submitted' ? (

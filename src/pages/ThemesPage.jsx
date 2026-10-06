@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
+import PromptInputs, { padPrompts } from '../components/PromptInputs'
+
+const PROMPT_PLACEHOLDERS = [
+  'How does this strength show up for you at work?',
+  "What's one way you could lean into this strength more?",
+  'Where do you see this strength creating value for your team?',
+]
 
 function ThemeRow({ theme, creatorName, onSave, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(theme.name)
-  const [promptsText, setPromptsText] = useState((theme.prompts ?? []).join('\n'))
+  const [promptBoxes, setPromptBoxes] = useState(() => padPrompts(theme.prompts))
   const [saving, setSaving] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -22,15 +29,15 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
 
   function startEdit() {
     setName(theme.name)
-    setPromptsText((theme.prompts ?? []).join('\n'))
+    setPromptBoxes(padPrompts(theme.prompts))
     setEditing(true)
     setExpanded(true)
     setError(null)
   }
 
   async function handleSave() {
-    const prompts = promptsText.split('\n').map(s => s.trim()).filter(Boolean)
-    if (!name.trim()) { setError('Theme name is required.'); return }
+    const prompts = promptBoxes.map(s => s.trim()).filter(Boolean)
+    if (!name.trim()) { setError('Session topic name is required.'); return }
     if (prompts.length === 0) { setError('Add at least one prompt.'); return }
     setSaving(true)
     setError(null)
@@ -71,7 +78,7 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
         <div className="flex items-center gap-3 ml-4 shrink-0">
           {confirmDelete ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Delete theme?</span>
+              <span className="text-xs text-gray-500">Delete session topic?</span>
               <button onClick={() => onDelete(theme.id)} className="text-xs font-medium text-red-600 hover:underline">Yes</button>
               <button onClick={() => setConfirmDelete(false)} className="text-xs text-gray-500 hover:underline">No</button>
             </div>
@@ -102,22 +109,14 @@ function ThemeRow({ theme, creatorName, onSave, onDelete }) {
           {editing ? (
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Theme name</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Session topic name</label>
                 <input
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full max-w-sm rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Prompts — one per line</label>
-                <textarea
-                  value={promptsText}
-                  onChange={e => setPromptsText(e.target.value)}
-                  rows={Math.max(4, promptsText.split('\n').length + 1)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
-                />
-              </div>
+              <PromptInputs prompts={promptBoxes} onChange={setPromptBoxes} allowAdd />
               {error && <p className="text-xs text-red-600">{error}</p>}
               <div className="flex gap-2">
                 <button
@@ -155,7 +154,7 @@ export default function ThemesPage() {
 
   const [addingNew, setAddingNew] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newPromptsText, setNewPromptsText] = useState('')
+  const [newPromptBoxes, setNewPromptBoxes] = useState(() => padPrompts([]))
   const [saveError, setSaveError] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -184,8 +183,8 @@ export default function ThemesPage() {
   }
 
   async function handleCreate() {
-    const prompts = newPromptsText.split('\n').map(s => s.trim()).filter(Boolean)
-    if (!newName.trim()) { setSaveError('Theme name is required.'); return }
+    const prompts = newPromptBoxes.map(s => s.trim()).filter(Boolean)
+    if (!newName.trim()) { setSaveError('Session topic name is required.'); return }
     if (prompts.length === 0) { setSaveError('Add at least one prompt.'); return }
     setSaving(true)
     setSaveError(null)
@@ -200,7 +199,7 @@ export default function ThemesPage() {
     if (error) { setSaveError(error.message); return }
     setAddingNew(false)
     setNewName('')
-    setNewPromptsText('')
+    setNewPromptBoxes(padPrompts([]))
     load()
   }
 
@@ -208,22 +207,22 @@ export default function ThemesPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Themes</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage session prompt themes used in group workshops.</p>
+          <h1 className="text-2xl font-bold text-gray-900">Session Topics</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage the session topics (sets of prompts) used in group workshops.</p>
         </div>
         <button
           onClick={() => { setAddingNew(true); setSaveError(null) }}
           className="bg-brand-500 hover:bg-brand-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
-          + New Theme
+          + New Session Topic
         </button>
       </div>
 
       {addingNew && (
         <div className="bg-white rounded-2xl border border-brand-200 p-6 mb-4 space-y-4">
-          <h2 className="font-semibold text-gray-900">New Theme</h2>
+          <h2 className="font-semibold text-gray-900">New Session Topic</h2>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Theme name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Session topic name</label>
             <input
               value={newName}
               onChange={e => setNewName(e.target.value)}
@@ -233,19 +232,8 @@ export default function ThemesPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prompts — one per line</label>
-            <textarea
-              value={newPromptsText}
-              onChange={e => setNewPromptsText(e.target.value)}
-              rows={6}
-              placeholder={"How does this strength show up for you at work?\nWhat's one way you could lean into this strength more?\nWhere do you see this strength creating value for your team?"}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
-            />
-            {newPromptsText.trim() && (
-              <p className="text-xs text-gray-400 mt-1">
-                {newPromptsText.split('\n').filter(s => s.trim()).length} prompts
-              </p>
-            )}
+            <label className="block text-sm font-medium text-gray-700 mb-2">Prompts</label>
+            <PromptInputs prompts={newPromptBoxes} onChange={setNewPromptBoxes} allowAdd placeholders={PROMPT_PLACEHOLDERS} />
           </div>
           {saveError && <p className="text-sm text-red-600">{saveError}</p>}
           <div className="flex gap-2">
@@ -254,7 +242,7 @@ export default function ThemesPage() {
               disabled={saving}
               className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold px-5 py-2.5 rounded-lg text-sm transition-colors"
             >
-              {saving ? 'Saving…' : 'Save Theme'}
+              {saving ? 'Saving…' : 'Save Session Topic'}
             </button>
             <button
               onClick={() => { setAddingNew(false); setSaveError(null) }}
@@ -270,8 +258,8 @@ export default function ThemesPage() {
         <p className="text-gray-500 text-sm">Loading…</p>
       ) : themes.length === 0 && !addingNew ? (
         <div className="text-center py-12 bg-white rounded-2xl border border-gray-200">
-          <p className="text-gray-500 mb-1">No themes yet.</p>
-          <p className="text-sm text-gray-400">Create your first theme to reuse prompts across sessions.</p>
+          <p className="text-gray-500 mb-1">No session topics yet.</p>
+          <p className="text-sm text-gray-400">Create your first session topic to reuse prompts across sessions.</p>
         </div>
       ) : (
         <div className="space-y-3">

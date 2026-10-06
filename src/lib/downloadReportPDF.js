@@ -2,7 +2,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { PERSONAL_INSIGHTS, ROWS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
-import { POWER_OF_2 } from '../data/powerOf2'
+import { P2_VARIANTS, p2HeaderLines } from '../data/powerOf2'
 import { getStrengthColors } from './strengthColors'
 
 function hexToRgb(hex) {
@@ -344,9 +344,9 @@ export async function downloadBringNeedPDF(person) {
 
 // ── Power of 2 ────────────────────────────────────────────────────────────────
 
-export async function downloadPowerOf2PDF(personA, personB, content = POWER_OF_2) {
-  const rowStrengths = (personA.top5 ?? []).filter(s => POWER_OF_2[s])
-  const colStrengths = (personB.top5 ?? []).filter(s => POWER_OF_2[s])
+// Shared one-page landscape grid used by the Power of 2 and Power of Me worksheets:
+// strengths down the side and across the top, each header carrying some text, blank cells.
+async function savePairGridPDF({ title, corner, rowStrengths, colStrengths, rowText, colText, filename }) {
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' })
   const pageWidth = doc.internal.pageSize.getWidth()
@@ -365,7 +365,7 @@ export async function downloadPowerOf2PDF(personA, personB, content = POWER_OF_2
   doc.setFontSize(14)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(30, 30, 30)
-  doc.text(`The Power of 2  ·  ${personA.name}  &  ${personB.name}`, pageWidth - 20, titleY, { align: 'right' })
+  doc.text(title, pageWidth - 20, titleY, { align: 'right' })
 
   doc.setDrawColor(220, 220, 220)
   doc.line(20, headerBottom, pageWidth - 20, headerBottom)
@@ -383,11 +383,11 @@ export async function downloadPowerOf2PDF(personA, personB, content = POWER_OF_2
   const rowHeaderColors = rowStrengths.map(s => hexToRgb(getStrengthColors(s)?.headerBg ?? '#3b5bdb'))
 
   const headRow = [
-    `${personA.name}\n(rows)  ×  ${personB.name}\n(columns)`,
-    ...colStrengths.map(s => `${s}\n\nI Bring ${content[s]?.bring ?? ''}\n\nI Need ${content[s]?.need ?? ''}`),
+    corner,
+    ...colStrengths.map(colText),
   ]
   const bodyRows = rowStrengths.map(s => [
-    `${s}\n\nI Bring ${content[s]?.bring ?? ''}\n\nI Need ${content[s]?.need ?? ''}`,
+    rowText(s),
     ...colStrengths.map(() => ''),
   ])
 
@@ -480,7 +480,44 @@ export async function downloadPowerOf2PDF(personA, personB, content = POWER_OF_2
     pageWidth / 2, pageHeight - 12, { align: 'center' }
   )
 
-  doc.save(safeName(`${personA.name} & ${personB.name} - Power of 2.pdf`))
+  doc.save(safeName(filename))
+}
+
+function p2Text(variant, content) {
+  return s => {
+    const lines = p2HeaderLines(variant, content[s]).map(l => (l.label ? `${l.label} ${l.text}` : l.text))
+    return `${s}\n\n${lines.join('\n\n')}`
+  }
+}
+
+export async function downloadPowerOf2PDF(personA, personB, content, variant = 'bring-need') {
+  const text = p2Text(variant, content)
+  const label = P2_VARIANTS[variant].label
+  await savePairGridPDF({
+    title: `The Power of 2 (${label})  ·  ${personA.name}  &  ${personB.name}`,
+    corner: `${personA.name}\n(rows)  ×  ${personB.name}\n(columns)`,
+    rowStrengths: (personA.top5 ?? []).filter(s => content[s]),
+    colStrengths: (personB.top5 ?? []).filter(s => content[s]),
+    rowText: text,
+    colText: text,
+    filename: `${personA.name} & ${personB.name} - Power of 2 - ${label}.pdf`,
+  })
+}
+
+// ── Power of Me ───────────────────────────────────────────────────────────────
+// One person's Top 5: The Role I Play across the top, Descriptive Words down the side.
+
+export async function downloadPowerOfMePDF(person, { role, words }) {
+  const strengths = (person.top5 ?? []).filter(s => role[s] && words[s])
+  await savePairGridPDF({
+    title: `The Power of Me  ·  ${person.name}`,
+    corner: 'The Role I Play\n(columns)\n\nDescriptive Words\n(rows)',
+    rowStrengths: strengths,
+    colStrengths: strengths,
+    rowText: s => `${s}\n\n${words[s]?.descriptiveWords ?? ''}`,
+    colText: s => `${s}\n\n${role[s]?.roleIPlay ?? ''}`,
+    filename: `${person.name} - Power of Me.pdf`,
+  })
 }
 
 // ── Base64 getters for email attachment ───────────────────────────────────────

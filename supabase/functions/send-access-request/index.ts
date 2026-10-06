@@ -27,7 +27,7 @@ serve(async (req) => {
       .eq('id', theme_id)
       .single()
 
-    const themeName = theme?.name ?? 'Unknown Theme'
+    const themeName = theme?.name ?? 'Unknown Session Topic'
 
     // Get coach email
     let toEmail: string | null = null

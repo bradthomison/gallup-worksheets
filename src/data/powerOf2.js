@@ -1,3 +1,5 @@
+import { PERSONAL_INSIGHTS } from './personalInsights'
+
 // Short "I Bring / I Need" statements used in the Power of 2 grid headers.
 // Source: Cascade© 2021 Releasing Strengths Ltd. Power of 2 worksheets.
 // All 34 strengths sourced directly from the official Power of 2 PDFs.
@@ -37,4 +39,74 @@ export const POWER_OF_2 = {
   Significance:      { bring: 'a desire for wanting and producing more.',                                   need: 'an appreciative audience that will bring out my best.' },
   Strategic:         { bring: 'creative anticipation, imagination and persistence.',                        need: 'freedom to make midcourse corrections.' },
   Woo:               { bring: 'energy to social situations.',                                               need: 'social variability.' },
+}
+
+// ── Variants ──────────────────────────────────────────────────────────────────
+// The Power of 2 grid comes in four flavours; they differ only in the text shown in
+// each strength's header. Every variant stores its editable text in report_content
+// under its own report_type.
+
+export const P2_VARIANT_ORDER = ['bring-need', 'descriptive-words', 'short-description', 'role']
+
+export const P2_VARIANTS = {
+  'bring-need': {
+    label: 'Bring / Need',
+    reportType: 'power_of_2',
+    fieldLabels: { bring: 'I Bring…', need: 'I Need…' },
+  },
+  'descriptive-words': {
+    label: 'Descriptive Words',
+    reportType: 'power_of_2_descriptive_words',
+    fieldLabels: { descriptiveWords: 'Descriptive Words' },
+  },
+  'short-description': {
+    label: 'Short Description',
+    reportType: 'power_of_2_short_description',
+    fieldLabels: { description: 'Short Description' },
+  },
+  role: {
+    label: 'The Role I Play',
+    reportType: 'power_of_2_role',
+    fieldLabels: { roleIPlay: 'The Role I Play' },
+  },
+}
+
+export function p2Variant(variant) {
+  return P2_VARIANTS[variant] ? variant : 'bring-need'
+}
+
+export function p2Path(variant) {
+  return variant === 'bring-need' ? '/power-of-2' : `/power-of-2/${variant}`
+}
+
+// The printed worksheets show descriptive words / roles in lower case.
+const lowerFirst = t => (t ? t.charAt(0).toLowerCase() + t.slice(1) : t)
+
+function buildDefaults(variant) {
+  if (variant === 'bring-need') return POWER_OF_2
+  const keys = Object.keys(P2_VARIANTS[variant].fieldLabels)
+  const out = {}
+  Object.keys(PERSONAL_INSIGHTS).forEach(s => {
+    out[s] = {}
+    keys.forEach(k => {
+      const t = PERSONAL_INSIGHTS[s]?.[k] ?? ''
+      out[s][k] = k === 'description' ? t : lowerFirst(t)
+    })
+  })
+  return out
+}
+
+// Built once so editors/pages get a stable reference.
+export const P2_DEFAULTS = Object.fromEntries(P2_VARIANT_ORDER.map(v => [v, buildDefaults(v)]))
+
+// Header lines for a strength in a Power of 2 grid: [{ label, text }]
+export function p2HeaderLines(variant, content) {
+  if (variant === 'bring-need') {
+    return [
+      { label: 'I Bring', text: content?.bring ?? '' },
+      { label: 'I Need', text: content?.need ?? '' },
+    ]
+  }
+  const key = Object.keys(P2_VARIANTS[variant].fieldLabels)[0]
+  return [{ label: null, text: content?.[key] ?? '' }]
 }

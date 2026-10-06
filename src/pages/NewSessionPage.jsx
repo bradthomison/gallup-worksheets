@@ -4,14 +4,18 @@ import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
 import { parseParticipants } from '../lib/parseParticipants'
+import PromptInputs, { padPrompts } from '../components/PromptInputs'
+import { PI_SENTINEL, TEAM_SENTINEL, SESSION_REPORT_OPTIONS, sessionReportInfo } from '../lib/sessionReports'
 
 export default function NewSessionPage() {
   const navigate = useNavigate()
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
+  // promptsText holds a built-in report / team overview choice; ordinary prompts live in promptBoxes
   const [promptsText, setPromptsText] = useState('')
+  const [promptBoxes, setPromptBoxes] = useState(() => padPrompts([]))
 
-  // Theme / report picker
+  // Session topic / report picker
   const [themes, setThemes] = useState([])
   const [reports, setReports] = useState([])
   const [selectedTheme, setSelectedTheme] = useState('')
@@ -41,17 +45,17 @@ export default function NewSessionPage() {
   const teamMap = {}
   teams.forEach(t => { teamMap[t.id] = t })
 
-  const PI_SENTINEL = '__personal_insights__'
   const REPORT_PREFIX = 'report:'
 
   function handleThemeChange(e) {
     const id = e.target.value
     setSelectedTheme(id)
-    if (!id) { setPromptsText(''); return }
-    if (id === PI_SENTINEL) { setPromptsText(PI_SENTINEL); return }
+    if (!id) { setPromptsText(''); setPromptBoxes(padPrompts([])); return }
+    if (id === TEAM_SENTINEL || SESSION_REPORT_OPTIONS.some(o => o.value === id)) { setPromptsText(id); return }
     if (id.startsWith(REPORT_PREFIX)) { setPromptsText(id); return }
     const theme = themes.find(t => t.id === id)
-    if (theme) setPromptsText((theme.prompts ?? []).join('\n'))
+    setPromptsText('')
+    if (theme) setPromptBoxes(padPrompts(theme.prompts))
   }
 
   function toggleSelect(id) {
@@ -97,7 +101,7 @@ export default function NewSessionPage() {
     e.preventDefault()
     setError(null)
 
-    const prompts = promptsText.split('\n').map(s => s.trim()).filter(Boolean)
+    const prompts = promptsText ? [promptsText] : promptBoxes.map(s => s.trim()).filter(Boolean)
     if (prompts.length === 0) { setError('Add at least one prompt.'); return }
 
     const fromExisting = people.filter(p => selected.has(p.id))
@@ -109,8 +113,9 @@ export default function NewSessionPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     const reportId = selectedTheme.startsWith(REPORT_PREFIX) ? selectedTheme.slice(REPORT_PREFIX.length) : null
-    const themeName = selectedTheme === PI_SENTINEL
-      ? 'Personal Insights'
+    const sentinelName = sessionReportInfo(selectedTheme)?.name
+    const themeName = sentinelName
+      ? sentinelName
       : reportId
         ? (reports.find(r => r.id === reportId)?.name ?? null)
         : selectedTheme
@@ -150,7 +155,6 @@ export default function NewSessionPage() {
     navigate(`/sessions/${session.id}`)
   }
 
-  const promptList = promptsText.split('\n').map(s => s.trim()).filter(Boolean)
   const totalSelected = selected.size + (tab === 'paste' ? parseParticipants(participantsText).parsed.length : 0)
 
   return (
@@ -244,36 +248,50 @@ export default function NewSessionPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="font-semibold text-gray-900">Prompts</h2>
-                <p className="text-sm text-gray-500 mt-0.5">One prompt per line — these become the row headers in the worksheet grid.</p>
+                <p className="text-sm text-gray-500 mt-0.5">These become the row headers in the worksheet grid.</p>
               </div>
               <div className="shrink-0">
-                <label className="block text-xs font-medium text-gray-500 mb-1">Load from theme or report</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Load from session topic or report</label>
                 <select
                   value={selectedTheme}
                   onChange={handleThemeChange}
                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                 >
                   <option value="">Choose…</option>
+                  <optgroup label="Team">
+                    <option value={TEAM_SENTINEL}>Team Strengths Overview</option>
+                  </optgroup>
                   <optgroup label="Reports">
-                    <option value={PI_SENTINEL}>Personal Insights</option>
+                    {SESSION_REPORT_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
                     {reports.map(r => (
                       <option key={r.id} value={`${REPORT_PREFIX}${r.id}`}>{r.name}</option>
                     ))}
                   </optgroup>
                   {themes.length > 0 && (
-                    <optgroup label="Themes">
+                    <optgroup label="Session Topics">
                       {themes.map(t => (
-                        <option key={t.id} value={t.id}>{t.name} ({t.prompts?.length ?? 0})</option>
+                        <option key={t.id} value={t.id}>{t.name}</option>
                       ))}
                     </optgroup>
                   )}
                 </select>
               </div>
             </div>
-            {promptsText === PI_SENTINEL ? (
+            {promptsText === TEAM_SENTINEL ? (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                <p className="font-medium">Team Strengths Overview selected</p>
+                <p className="text-xs mt-0.5 text-indigo-700">Each participant's link opens their team page, where they can open all of their reports. Participants need to be on a team. No prompts needed.</p>
+              </div>
+            ) : sessionReportInfo(promptsText) ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                <p className="font-medium">Personal Insights selected</p>
-                <p className="text-xs mt-0.5 text-emerald-700">Each participant will receive a pre-filled report based on their top 5 strengths. No prompts needed.</p>
+                <p className="font-medium">{sessionReportInfo(promptsText).name} selected</p>
+                <p className="text-xs mt-0.5 text-emerald-700">
+                  {sessionReportInfo(promptsText).kind === 'p2'
+                    ? 'Each participant will pair with a teammate to complete the worksheet, so participants need to be on a team. No prompts needed.'
+                    : 'Each participant will receive a pre-filled report based on their top 5 strengths. No prompts needed.'}
+                </p>
               </div>
             ) : promptsText.startsWith(REPORT_PREFIX) ? (
               <div className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
@@ -282,16 +300,10 @@ export default function NewSessionPage() {
               </div>
             ) : (
               <>
-                <textarea
-                  value={promptsText}
-                  onChange={e => { setPromptsText(e.target.value); setSelectedTheme('') }}
-                  rows={6}
-                  placeholder={"How does this strength show up for you at work?\nWhat's one way you could lean into this strength more?\nWhere do you see this strength creating value for your team?"}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
+                <PromptInputs
+                  prompts={promptBoxes}
+                  onChange={boxes => { setPromptBoxes(boxes); setSelectedTheme('') }}
                 />
-                {promptList.length > 0 && (
-                  <p className="text-xs text-gray-400">{promptList.length} prompt{promptList.length !== 1 ? 's' : ''}</p>
-                )}
               </>
             )}
           </div>

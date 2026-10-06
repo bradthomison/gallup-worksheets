@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
+import { P2_VARIANTS, P2_VARIANT_ORDER, p2Path } from '../data/powerOf2'
 import SiteFooter from '../components/SiteFooter'
 
 export default function TeamPortalPage() {
@@ -10,6 +11,7 @@ export default function TeamPortalPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const memberParam = searchParams.get('member')
+  const emailParam = searchParams.get('email')
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -29,10 +31,12 @@ export default function TeamPortalPage() {
         const loadedMembers = data.members ?? []
         setMembers(loadedMembers)
         setReports(data.reports ?? [])
-        if (memberParam) {
-          const pre = loadedMembers.find(m => m.id === memberParam)
-          if (pre) setSelected(pre)
-        }
+        const pre = memberParam
+          ? loadedMembers.find(m => m.id === memberParam)
+          : emailParam
+            ? loadedMembers.find(m => m.email?.toLowerCase() === emailParam.toLowerCase())
+            : null
+        if (pre) setSelected(pre)
       }
       setLoading(false)
     }
@@ -82,17 +86,31 @@ export default function TeamPortalPage() {
       }
     }
 
-    cards.push({
-      id: 'power-of-2',
-      name: 'The Power of 2',
-      description: 'Pair with a teammate to explore how your strengths interact.',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      ),
-      href: `/power-of-2?email=${email}&teamId=${teamId}`,
+    const pairIcon = (
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    )
+
+    P2_VARIANT_ORDER.forEach(v => {
+      cards.push({
+        id: `power-of-2-${v}`,
+        name: `The Power of 2 · ${P2_VARIANTS[v].label}`,
+        description: 'Pair with a teammate to explore how your strengths interact.',
+        icon: pairIcon,
+        href: `${p2Path(v)}?email=${email}&teamId=${teamId}`,
+      })
     })
+
+    if (hasStrengths(person)) {
+      cards.push({
+        id: 'power-of-me',
+        name: 'The Power of Me',
+        description: 'Explore how the roles and descriptive words of your own Top 5 strengths interact.',
+        icon: pairIcon,
+        href: `/power-of-me?email=${email}`,
+      })
+    }
 
     reports.forEach(r => {
       cards.push({
