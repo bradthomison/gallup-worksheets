@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
+import { POWER_OF_2 } from '../data/powerOf2'
 
 const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS).sort()
 
@@ -23,6 +24,11 @@ const FIELD_LABELS = {
 const BRING_NEED_FIELD_LABELS = {
   bring: 'I Bring (The value I add)',
   need:  'I Need (My Energizers)',
+}
+
+const POWER_OF_2_FIELD_LABELS = {
+  bring: 'I Bring…',
+  need:  'I Need…',
 }
 
 function StrengthContentEditor({ reportType, staticFallback, fieldLabels = FIELD_LABELS }) {
@@ -368,6 +374,66 @@ function BringNeedReport() {
   )
 }
 
+function PowerOf2Report() {
+  const [expanded, setExpanded] = useState(false)
+  const [lmsCopied, setLmsCopied] = useState(false)
+
+  const lmsUrl = `${window.location.origin}/power-of-2`
+
+  function copyLmsLink() {
+    navigator.clipboard.writeText(lmsUrl).then(() => {
+      setLmsCopied(true)
+      setTimeout(() => setLmsCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4">
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="flex items-center gap-3 text-left flex-1 min-w-0"
+        >
+          <svg
+            className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <div>
+            <p className="font-semibold text-gray-900">The Power of 2</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                34 strengths · I Bring / I Need
+              </span>
+              <span className="text-xs text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                Built-in
+              </span>
+            </div>
+          </div>
+        </button>
+      </div>
+      {expanded && (
+        <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-500 mb-0.5">Acorn Course Link</p>
+              <p className="text-xs text-brand-500 truncate">{lmsUrl}</p>
+            </div>
+            <button
+              onClick={copyLmsLink}
+              className="shrink-0 ml-4 text-xs font-medium text-gray-500 hover:text-gray-800 border border-gray-200 bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            >
+              {lmsCopied ? '✓ Copied' : 'Copy Link'}
+            </button>
+          </div>
+          <StrengthContentEditor reportType="power_of_2" staticFallback={POWER_OF_2} fieldLabels={POWER_OF_2_FIELD_LABELS} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CustomReportCard({ report: initialReport, onDelete }) {
   const [report, setReport] = useState(initialReport)
   const [expanded, setExpanded] = useState(false)
@@ -670,6 +736,7 @@ export default function ReportsPage() {
         <div className="space-y-3">
           <PersonalInsightsReport />
           <BringNeedReport />
+          <PowerOf2Report />
           {reports.map(r => (
             <CustomReportCard key={r.id} report={r} onDelete={handleDelete} />
           ))}

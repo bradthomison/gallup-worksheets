@@ -344,7 +344,7 @@ export async function downloadBringNeedPDF(person) {
 
 // ── Power of 2 ────────────────────────────────────────────────────────────────
 
-export async function downloadPowerOf2PDF(personA, personB) {
+export async function downloadPowerOf2PDF(personA, personB, content = POWER_OF_2) {
   const rowStrengths = (personA.top5 ?? []).filter(s => POWER_OF_2[s])
   const colStrengths = (personB.top5 ?? []).filter(s => POWER_OF_2[s])
 
@@ -384,10 +384,10 @@ export async function downloadPowerOf2PDF(personA, personB) {
 
   const headRow = [
     `${personA.name}\n(rows)  ×  ${personB.name}\n(columns)`,
-    ...colStrengths.map(s => `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`),
+    ...colStrengths.map(s => `${s}\n\nI Bring ${content[s]?.bring ?? ''}\n\nI Need ${content[s]?.need ?? ''}`),
   ]
   const bodyRows = rowStrengths.map(s => [
-    `${s}\n\nI Bring ${POWER_OF_2[s]?.bring ?? ''}\n\nI Need ${POWER_OF_2[s]?.need ?? ''}`,
+    `${s}\n\nI Bring ${content[s]?.bring ?? ''}\n\nI Need ${content[s]?.need ?? ''}`,
     ...colStrengths.map(() => ''),
   ])
 

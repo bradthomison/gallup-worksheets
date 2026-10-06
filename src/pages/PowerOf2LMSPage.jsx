@@ -64,6 +64,7 @@ export default function PowerOf2LMSPage() {
   const [partner, setPartner] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [cells, setCells] = useState({})
+  const [content, setContent] = useState(POWER_OF_2)
 
   async function loadData(emailVal, teamId) {
     setLoading(true)
@@ -114,6 +115,18 @@ export default function PowerOf2LMSPage() {
 
   useEffect(() => {
     if (emailParam) loadData(emailParam, teamIdParam)
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from('report_content')
+      .select('strength_name, content')
+      .eq('report_type', 'power_of_2')
+      .then(({ data }) => {
+        const merged = { ...POWER_OF_2 }
+        ;(data ?? []).forEach(r => { if (r.content) merged[r.strength_name] = { ...merged[r.strength_name], ...r.content } })
+        setContent(merged)
+      })
   }, [])
 
   const rowStrengths = (person?.top5 ?? []).filter(s => POWER_OF_2[s])
@@ -206,7 +219,7 @@ export default function PowerOf2LMSPage() {
                   onClick={async () => {
                     if (!partner) return
                     setPdfLoading(true)
-                    await downloadPowerOf2PDF(person, partner)
+                    await downloadPowerOf2PDF(person, partner, content)
                     setPdfLoading(false)
                   }}
                   disabled={pdfLoading || !partner}
@@ -299,8 +312,8 @@ export default function PowerOf2LMSPage() {
                               style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                             >
                               <p className="font-bold text-sm mb-1.5">{s}</p>
-                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
-                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {content[s]?.bring ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {content[s]?.need ?? ''}</p>
                             </th>
                           )
                         })}
@@ -318,8 +331,8 @@ export default function PowerOf2LMSPage() {
                               style={{ background: c.headerBg, color: c.headerText, printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' }}
                             >
                               <p className="font-bold text-sm mb-1.5">{s}</p>
-                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {POWER_OF_2[s]?.bring ?? ''}</p>
-                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {POWER_OF_2[s]?.need ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90"><span className="font-semibold">I Bring</span> {content[s]?.bring ?? ''}</p>
+                              <p className="text-[11px] leading-snug opacity-90 mt-1"><span className="font-semibold">I Need</span> {content[s]?.need ?? ''}</p>
                             </th>
                             {colStrengths.map(cs => (
                               <td
