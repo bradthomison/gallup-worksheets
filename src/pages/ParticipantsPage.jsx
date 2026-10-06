@@ -1244,7 +1244,7 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
         {loading ? (
           <p className="text-gray-500 text-sm px-5 py-6">Loading…</p>
         ) : (
@@ -1319,7 +1319,7 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-900">{p.name}</p>
                       </td>
-                      <td className="px-4 py-3 text-gray-500">{p.email}</td>
+                      <td className="px-4 py-3 text-gray-500 break-all">{p.email}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
