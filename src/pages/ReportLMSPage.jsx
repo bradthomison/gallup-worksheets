@@ -154,8 +154,9 @@ export default function ReportLMSPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <header className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
             <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
+            <button onClick={() => window.close()} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">✕ Close</button>
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center">
@@ -172,8 +173,9 @@ export default function ReportLMSPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
+          <button onClick={() => window.close()} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">✕ Close</button>
         </div>
       </header>
 

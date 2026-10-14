@@ -212,7 +212,10 @@ export default function WorksheetPage() {
             <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
             <p className="text-sm text-gray-400">{session.title}</p>
           </div>
-          <p className="text-sm font-medium text-gray-700">{participant.name}</p>
+          <div className="flex items-center gap-4">
+            <p className="text-sm font-medium text-gray-700">{participant.name}</p>
+            <button onClick={() => window.close()} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">✕ Close</button>
+          </div>
         </div>
       </header>
 
