@@ -19,6 +19,8 @@ import TeamPortalPage from './pages/TeamPortalPage'
 import PowerOf2LMSPage from './pages/PowerOf2LMSPage'
 import PowerOfMeLMSPage from './pages/PowerOfMeLMSPage'
 import TalentMapPage from './pages/TalentMapPage'
+import ParticipantSignInPage from './pages/ParticipantSignInPage'
+import ParticipantDashboardPage from './pages/ParticipantDashboardPage'
 import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
 
@@ -27,6 +29,8 @@ function PrivateRoute({ children }) {
   if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Loading…</div>
   return user ? children : <Navigate to="/login" replace />
 }
+
+// Participant pages handle their own auth guard internally (redirects to /sign-in)
 
 export default function App() {
   return (
@@ -43,6 +47,8 @@ export default function App() {
       <Route path="/power-of-2/:variant?" element={<PowerOf2LMSPage />} />
       <Route path="/power-of-me" element={<PowerOfMeLMSPage />} />
       <Route path="/talent-map" element={<TalentMapPage />} />
+      <Route path="/sign-in" element={<ParticipantSignInPage />} />
+      <Route path="/me" element={<ParticipantDashboardPage />} />
       <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
