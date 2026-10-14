@@ -565,32 +565,6 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
               </div>
             )
           })}
-          {/* Team Reports */}
-          {person.team_id && (
-            <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">Team Reports</p>
-              {[
-                { key: 'grid', label: 'Team Strengths Grid', path: `/team-grid?teamId=${person.team_id}` },
-                { key: 'spark', label: 'Theme Spark', path: `/team-spark?teamId=${person.team_id}` },
-              ].map(({ key, path, label }) => {
-                const url = `${window.location.origin}${path}`
-                return (
-                  <div key={key} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Team</span>
-                      <span className="text-sm text-gray-700 truncate">{label}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
-                      <button onClick={() => window.open(url, '_blank', 'noopener')} className={actionBtnBrand}>Open</button>
-                      <button onClick={() => copyLink(key, url)} className={`pl-2.5 ${actionBtn}`}>
-                        {copied[key] ? '✓ Copied' : 'Copy Link'}
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </>
-          )}
         </div>
       )}
     </div>
@@ -971,13 +945,24 @@ function parseGallupExport(arrayBuffer) {
 }
 
 function ImportRosterModal({ teams, onClose, onImported }) {
-  const [step, setStep]             = useState('upload') // upload | preview | importing | done
+  const [step, setStep]             = useState('upload') // upload | preview | duplicates | importing | done
   const [participants, setParticipants] = useState([])
   const [teamId, setTeamId]         = useState('')
   const [error, setError]           = useState(null)
   const [results, setResults]       = useState(null)
   const [dragging, setDragging]     = useState(false)
   const fileRef = useRef()
+
+  // Local team list (grows when user creates a team inline)
+  const [localTeams, setLocalTeams] = useState(teams)
+  const [showNewTeamForm, setShowNewTeamForm] = useState(false)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [newTeamSaving, setNewTeamSaving] = useState(false)
+  const [newTeamError, setNewTeamError] = useState(null)
+
+  // Duplicate review
+  const [duplicates, setDuplicates] = useState([]) // [{name, email, top5}]
+  const [dupDecisions, setDupDecisions] = useState({}) // email → 'skip' | 'include'
 
   function handleFile(file) {
     if (!file) return
@@ -994,26 +979,61 @@ function ImportRosterModal({ teams, onClose, onImported }) {
     reader.readAsArrayBuffer(file)
   }
 
-  async function handleImport() {
-    setStep('importing')
+  async function handleCreateTeam() {
+    if (!newTeamName.trim()) { setNewTeamError('Team name is required'); return }
+    setNewTeamSaving(true)
+    setNewTeamError(null)
     const { data: { user } } = await supabase.auth.getUser()
+    const { data: team, error: err } = await supabase
+      .from('teams')
+      .insert({ name: newTeamName.trim(), created_by: user.id })
+      .select()
+      .single()
+    setNewTeamSaving(false)
+    if (err) { setNewTeamError(err.message); return }
+    setLocalTeams(prev => [...prev, team])
+    setTeamId(team.id)
+    setNewTeamName('')
+    setShowNewTeamForm(false)
+  }
 
-    // Fetch existing emails in one query to detect duplicates
+  async function handleCheckDuplicates() {
     const { data: existing } = await supabase.from('people').select('email')
     const existingEmails = new Set((existing ?? []).map(p => p.email.toLowerCase()))
+    const dupes = participants.filter(p => existingEmails.has(p.email.toLowerCase()))
+    if (dupes.length === 0) {
+      await runImport(participants)
+    } else {
+      const decisions = {}
+      dupes.forEach(p => { decisions[p.email.toLowerCase()] = 'skip' })
+      setDuplicates(dupes)
+      setDupDecisions(decisions)
+      setStep('duplicates')
+    }
+  }
 
-    const toInsert = participants.filter(p => !existingEmails.has(p.email))
-    const skipped  = participants.length - toInsert.length
-
+  async function runImport(toInsert) {
+    setStep('importing')
+    const { data: { user } } = await supabase.auth.getUser()
     if (toInsert.length > 0) {
       await supabase.from('people').insert(
         toInsert.map(p => ({ name: p.name, email: p.email, top5: p.top5, team_id: teamId || null, created_by: user.id }))
       )
     }
-
+    const skipped = participants.length - toInsert.length
     setResults({ imported: toInsert.length, skipped })
     setStep('done')
     onImported()
+  }
+
+  async function handleImportWithDecisions() {
+    const toInsert = participants.filter(p => {
+      const key = p.email.toLowerCase()
+      return dupDecisions[key] !== 'skip' || !duplicates.find(d => d.email.toLowerCase() === key)
+    })
+    // Participants that are duplicates and marked 'include' need updating — we'll insert them
+    // (handleCheckDuplicates already excluded non-dupes from decisions, so non-dupes are always inserted)
+    await runImport(toInsert)
   }
 
   return (
@@ -1052,7 +1072,7 @@ function ImportRosterModal({ teams, onClose, onImported }) {
               <button onClick={() => { setStep('upload'); setParticipants([]) }} className="text-xs text-brand-500 hover:underline">Choose different file</button>
             </div>
 
-            <div className="overflow-auto max-h-64 border border-gray-200 rounded-xl">
+            <div className="overflow-auto max-h-56 border border-gray-200 rounded-xl">
               <table className="w-full text-xs">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
@@ -1075,20 +1095,115 @@ function ImportRosterModal({ teams, onClose, onImported }) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Assign to team <span className="font-normal text-gray-400">(optional)</span></label>
-              <select
-                value={teamId}
-                onChange={e => setTeamId(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              >
-                <option value="">— No team —</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <div className="flex gap-2">
+                <select
+                  value={teamId}
+                  onChange={e => { setTeamId(e.target.value); setShowNewTeamForm(false) }}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                >
+                  <option value="">— No team —</option>
+                  {localTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                <button
+                  onClick={() => { setShowNewTeamForm(v => !v); setNewTeamName(''); setNewTeamError(null) }}
+                  className="shrink-0 flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  title="Create new team"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  New team
+                </button>
+              </div>
+
+              {showNewTeamForm && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                  <p className="text-xs font-medium text-gray-600">Create new team</p>
+                  <div className="flex gap-2">
+                    <input
+                      value={newTeamName}
+                      onChange={e => setNewTeamName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCreateTeam(); if (e.key === 'Escape') setShowNewTeamForm(false) }}
+                      placeholder="Team name"
+                      autoFocus
+                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                    <button
+                      onClick={handleCreateTeam}
+                      disabled={newTeamSaving}
+                      className="shrink-0 bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold px-3 py-1.5 rounded-lg text-sm transition-colors"
+                    >
+                      {newTeamSaving ? 'Creating…' : 'Create'}
+                    </button>
+                    <button
+                      onClick={() => setShowNewTeamForm(false)}
+                      className="shrink-0 text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded-lg text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {newTeamError && <p className="text-xs text-red-500">{newTeamError}</p>}
+                </div>
+              )}
             </div>
 
             <div className="flex gap-3">
               <button onClick={onClose} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleImport} className="flex-1 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 text-sm transition-colors">
-                Import {participants.length} Participants
+              <button onClick={handleCheckDuplicates} className="flex-1 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 text-sm transition-colors">
+                Review &amp; Import {participants.length} Participants
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'duplicates' && (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M12 4a8 8 0 100 16 8 8 0 000-16z" /></svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{duplicates.length} potential duplicate{duplicates.length !== 1 ? 's' : ''} found</p>
+                <p className="text-xs text-gray-500">These emails already exist in your participant database. Choose what to do with each one.</p>
+              </div>
+            </div>
+
+            <div className="overflow-auto max-h-72 border border-gray-200 rounded-xl divide-y divide-gray-100">
+              {duplicates.map((p) => {
+                const key = p.email.toLowerCase()
+                const decision = dupDecisions[key] ?? 'skip'
+                return (
+                  <div key={key} className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{p.email}</p>
+                    </div>
+                    <div className="flex rounded-lg border border-gray-300 overflow-hidden shrink-0 text-xs font-medium">
+                      <button
+                        onClick={() => setDupDecisions(d => ({ ...d, [key]: 'skip' }))}
+                        className={`px-3 py-1.5 transition-colors ${decision === 'skip' ? 'bg-gray-800 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        Skip
+                      </button>
+                      <button
+                        onClick={() => setDupDecisions(d => ({ ...d, [key]: 'include' }))}
+                        className={`px-3 py-1.5 border-l border-gray-300 transition-colors ${decision === 'include' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        Include anyway
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-gray-400 px-1">
+              <span>{Object.values(dupDecisions).filter(v => v === 'skip').length} will be skipped</span>
+              <span>{Object.values(dupDecisions).filter(v => v === 'include').length} will be added anyway</span>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep('preview')} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Back</button>
+              <button onClick={handleImportWithDecisions} className="flex-1 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 text-sm transition-colors">
+                Confirm &amp; Import
               </button>
             </div>
           </>

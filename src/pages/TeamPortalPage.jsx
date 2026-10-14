@@ -312,52 +312,12 @@ export default function TeamPortalPage() {
           <>
             <div className="mb-8">
               <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-1">{team.name}</p>
-              <h1 className="text-3xl font-bold text-gray-900">Who are you?</h1>
-              <p className="text-gray-500 text-sm mt-2">Select your name to view your available reports.</p>
+              <h1 className="text-3xl font-bold text-gray-900">Team Portal</h1>
             </div>
 
-            {members.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-                <p className="text-gray-500 text-sm">No members have been added to this team yet.</p>
-                <p className="text-xs text-gray-400 mt-1">Contact your coach to get set up.</p>
-              </div>
-            ) : (
-              <>
-                {members.length > 6 && (
-                  <div className="mb-4">
-                    <input
-                      type="search"
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      placeholder="Search your name…"
-                      autoFocus
-                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    />
-                  </div>
-                )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {filtered.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => { setSelected(m); navigate(`/team/${teamId}?member=${m.id}`, { replace: true }) }}
-                      className="flex items-center gap-3 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-xl px-5 py-4 text-left transition-colors group"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-semibold text-sm shrink-0 group-hover:bg-brand-200 transition-colors">
-                        {m.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                      </div>
-                      <span className="font-medium text-gray-900 text-sm">{m.name}</span>
-                    </button>
-                  ))}
-                  {filtered.length === 0 && (
-                    <p className="col-span-2 text-sm text-gray-400 text-center py-6">No matches for &ldquo;{search}&rdquo;</p>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* Team Reports */}
+            {/* Team Reports — at top */}
             {members.some(m => (m.top5 ?? []).some(Boolean)) && (
-              <div className="mt-10">
+              <div className="mb-10">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Team Reports</h2>
                 <p className="text-sm text-gray-500 mb-4">Reports for the whole team.</p>
                 <div className="grid grid-cols-1 gap-4">
@@ -398,6 +358,48 @@ export default function TeamPortalPage() {
                 </div>
               </div>
             )}
+
+            {/* Team members — with search always visible */}
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Team Members</h2>
+              <p className="text-gray-500 text-sm mb-4">Select your name to view your available reports.</p>
+
+              {members.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+                  <p className="text-gray-500 text-sm">No members have been added to this team yet.</p>
+                  <p className="text-xs text-gray-400 mt-1">Contact your coach to get set up.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <input
+                      type="search"
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      placeholder="Search your name…"
+                      className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {filtered.map(m => (
+                      <button
+                        key={m.id}
+                        onClick={() => { setSelected(m); navigate(`/team/${teamId}?member=${m.id}`, { replace: true }) }}
+                        className="flex items-center gap-3 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-xl px-5 py-4 text-left transition-colors group"
+                      >
+                        <div className="w-9 h-9 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center font-semibold text-sm shrink-0 group-hover:bg-brand-200 transition-colors">
+                          {m.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </div>
+                        <span className="font-medium text-gray-900 text-sm">{m.name}</span>
+                      </button>
+                    ))}
+                    {filtered.length === 0 && (
+                      <p className="col-span-2 text-sm text-gray-400 text-center py-6">No matches for &ldquo;{search}&rdquo;</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </>
         ) : (
           <>
