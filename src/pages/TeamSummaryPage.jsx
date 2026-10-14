@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { DOMAINS } from '../lib/strengthColors'
 import { TEAM_SUMMARY_PHRASES } from '../data/teamSummaryPhrases'
-import SiteFooter from '../components/SiteFooter'
 
 // ── Strength → domain map ─────────────────────────────────────────────────────
 
@@ -444,7 +443,6 @@ export default function TeamSummaryPage() {
         )}
       </main>
 
-      <SiteFooter className="no-print" />
     </div>
   )
 }
