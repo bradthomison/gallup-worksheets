@@ -445,8 +445,9 @@ export default function SessionPage() {
     setManagePendingRemove(new Set())
     setAddSelected(new Set())
     setAddSearch('')
-    setPasteText('')
     setAddTab('existing')
+    supabase.from('people').select('*').order('name').then(({ data }) => setPeople(data ?? []))
+    supabase.from('teams').select('*').order('name').then(({ data }) => setTeams(data ?? []))
     setManageModal(true)
   }
 
@@ -456,18 +457,9 @@ export default function SessionPage() {
       await supabase.from('participants').delete().in('id', [...managePendingRemove])
     }
     const fromPeople = people.filter(p => addSelected.has(p.id))
-    const { parsed: fromPaste } = parseParticipants(pasteText)
-    if (fromPaste.length > 0) {
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('people').upsert(
-        fromPaste.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
-        { onConflict: 'email,created_by' }
-      )
-    }
-    const newParticipants = [...fromPeople, ...fromPaste]
-    if (newParticipants.length > 0) {
+    if (fromPeople.length > 0) {
       await supabase.from('participants').insert(
-        newParticipants.map(p => ({
+        fromPeople.map(p => ({
           session_id: id,
           name: p.name,
           email: p.email,
@@ -683,9 +675,9 @@ export default function SessionPage() {
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                     Add Participants
-                    {addSelected.size + parseParticipants(pasteText).parsed.length > 0 && (
+                    {addSelected.size > 0 && (
                       <span className="ml-2 normal-case font-medium bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full">
-                        {addSelected.size + parseParticipants(pasteText).parsed.length} to add
+                        {addSelected.size} to add
                       </span>
                     )}
                   </p>
@@ -697,10 +689,6 @@ export default function SessionPage() {
                     <button type="button" onClick={() => setAddTab('team')}
                       className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'team' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
                       Pick a team
-                    </button>
-                    <button type="button" onClick={() => setAddTab('paste')}
-                      className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'paste' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
-                      Paste new
                     </button>
                   </div>
                 </div>
@@ -771,17 +759,6 @@ export default function SessionPage() {
                   )
                 )}
 
-                {addTab === 'paste' && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-500">One per line: <code className="text-xs bg-gray-100 rounded px-1.5 py-0.5 text-gray-700">Name, Email, S1, S2, S3, S4, S5</code></p>
-                    <textarea value={pasteText} onChange={handlePasteChange} rows={5}
-                      placeholder="Jane Smith, jane@example.com, Achiever, Learner, Relator, Futuristic, Strategic"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y" />
-                    {pasteErrors.length > 0 && (
-                      <ul className="text-xs text-red-600 space-y-0.5">{pasteErrors.map((err, i) => <li key={i}>{err}</li>)}</ul>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -789,9 +766,9 @@ export default function SessionPage() {
             <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl shrink-0">
               <span className="text-sm text-gray-500">
                 {managePendingRemove.size > 0 && <span className="text-red-600 font-medium">{managePendingRemove.size} removing</span>}
-                {managePendingRemove.size > 0 && (addSelected.size + parseParticipants(pasteText).parsed.length) > 0 && <span className="mx-1 text-gray-300">·</span>}
-                {(addSelected.size + parseParticipants(pasteText).parsed.length) > 0 && <span className="text-green-600 font-medium">{addSelected.size + parseParticipants(pasteText).parsed.length} adding</span>}
-                {managePendingRemove.size === 0 && addSelected.size === 0 && parseParticipants(pasteText).parsed.length === 0 && <span>No changes</span>}
+                {managePendingRemove.size > 0 && addSelected.size > 0 && <span className="mx-1 text-gray-300">·</span>}
+                {addSelected.size > 0 && <span className="text-green-600 font-medium">{addSelected.size} adding</span>}
+                {managePendingRemove.size === 0 && addSelected.size === 0 && <span>No changes</span>}
               </span>
               <div className="flex gap-2">
                 <button onClick={() => setManageModal(false)}
@@ -799,7 +776,7 @@ export default function SessionPage() {
                   Cancel
                 </button>
                 <button onClick={saveManageModal}
-                  disabled={manageSaving || pasteErrors.length > 0 || (managePendingRemove.size === 0 && addSelected.size === 0 && parseParticipants(pasteText).parsed.length === 0)}
+                  disabled={manageSaving || (managePendingRemove.size === 0 && addSelected.size === 0)}
                   className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
                   {manageSaving ? 'Saving…' : 'Save changes'}
                 </button>
