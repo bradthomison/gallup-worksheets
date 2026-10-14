@@ -152,7 +152,7 @@ function PieChart({ domainThemes }) {
   }
 
   return (
-    <svg viewBox="0 0 140 140" className="w-full max-w-[140px]">
+    <svg viewBox="0 0 140 140" className="w-full">
       {slices.map(({ key, pct, start, end }) => {
         if (pct === 0) return null
         const d = DOMAINS[key]
@@ -179,10 +179,9 @@ function PieChart({ domainThemes }) {
 
 function BarChart({ counts }) {
   const entries = Object.entries(counts)
-    .filter(([, c]) => c > 0)
     .sort(([, a], [, b]) => b - a)
 
-  if (!entries.length) return null
+  if (!entries.length || entries.every(([, c]) => c === 0)) return null
 
   const maxCount = entries[0][1]
   const LABEL_W = 105
@@ -205,12 +204,16 @@ function BarChart({ counts }) {
               textAnchor="end" fill="#374151" fontFamily="Arial, sans-serif">
               {name}
             </text>
-            <rect x={LABEL_W} y={y + 2} width={Math.max(barW, 2)} height={ROW_H - 5}
-              rx={1.5} fill={d.headerBg} opacity={0.85} />
-            <text x={LABEL_W + barW + 3} y={y + ROW_H / 2 + 3} fontSize="8"
-              fill={d.text} fontFamily="Arial, sans-serif" fontWeight="bold">
-              {count}
-            </text>
+            {count > 0 && (
+              <rect x={LABEL_W} y={y + 2} width={Math.max(barW, 2)} height={ROW_H - 5}
+                rx={1.5} fill={d.headerBg} opacity={0.85} />
+            )}
+            {count > 0 && (
+              <text x={LABEL_W + barW + 3} y={y + ROW_H / 2 + 3} fontSize="8"
+                fill={d.text} fontFamily="Arial, sans-serif" fontWeight="bold">
+                {count}
+              </text>
+            )}
           </g>
         )
       })}
