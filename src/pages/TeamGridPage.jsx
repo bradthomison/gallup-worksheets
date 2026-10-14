@@ -147,7 +147,7 @@ export default function TeamGridPage() {
                         <th
                           key={s}
                           className="border border-gray-200 px-1 py-2 font-medium text-center"
-                          style={{ backgroundColor: style.bg, color: style.text, writingMode: 'vertical-rl', transform: 'rotate(180deg)', maxHeight: '90px', minWidth: '24px' }}
+                          style={{ backgroundColor: style.bg, color: style.text, writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '160px', minWidth: '24px' }}
                         >
                           {s}
                         </th>
