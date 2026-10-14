@@ -60,13 +60,13 @@ function buildFace(name, strengths, cx, cy, rotation) {
     </div>`
 }
 
-function buildTentPage(name, strengths) {
+function buildTentPage(name, strengths, breakAfter) {
   const tick = (left) => `
     <div style="position:absolute;left:${left};top:0;height:0.2in;width:1px;background:#555;"></div>
     <div style="position:absolute;left:${left};bottom:0;height:0.2in;width:1px;background:#555;"></div>`
 
   return `
-    <div style="position:relative;width:11in;height:8.5in;page-break-after:always;background:white;">
+    <div style="position:relative;width:11in;height:8.5in;${breakAfter ? 'page-break-after:always;' : ''}background:white;">
       ${tick('1in')}
       ${tick('5.5in')}
       ${tick('10in')}
@@ -76,9 +76,9 @@ function buildTentPage(name, strengths) {
 }
 
 export function printNameTents(people) {
-  const pages = people.map(p => {
+  const pages = people.map((p, i) => {
     const strengths = (p.top5 ?? []).filter(Boolean)
-    return buildTentPage(p.name, strengths)
+    return buildTentPage(p.name, strengths, i < people.length - 1)
   }).join('')
 
   const html = `<!DOCTYPE html>
@@ -89,7 +89,9 @@ export function printNameTents(people) {
   @page { size: letter landscape; margin: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: white; }
-  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body>
