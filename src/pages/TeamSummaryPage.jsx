@@ -335,16 +335,8 @@ export default function TeamSummaryPage() {
                 <BarChart counts={counts} />
               </div>
 
-              {/* Col 2: Member list + Pie chart */}
-              <div className="shrink-0 w-[155px]">
-                <div className="mb-5">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Team Members</p>
-                  <ul className="space-y-0.5">
-                    {members.map(m => (
-                      <li key={m.id} className="text-xs text-gray-700">{m.name}</li>
-                    ))}
-                  </ul>
-                </div>
+              {/* Col 2: Pie chart */}
+              <div className="shrink-0 w-[155px] pt-5">
                 <PieChart domainThemes={domainThemes} />
               </div>
 
