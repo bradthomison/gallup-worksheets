@@ -1,6 +1,29 @@
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// ── Signature verification ────────────────────────────────────────────────────
+
+async function verifyHookSignature(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
+  try {
+    // Secret format: v1,whsec_<base64>
+    const b64Secret = secret.replace(/^v1,whsec_/, '')
+    const keyBytes = Uint8Array.from(atob(b64Secret), c => c.charCodeAt(0))
+
+    const key = await crypto.subtle.importKey(
+      'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['verify'],
+    )
+
+    // Header format: v1=<base64-hmac>
+    const b64Sig = signatureHeader.replace(/^v1=/, '')
+    const sigBytes = Uint8Array.from(atob(b64Sig), c => c.charCodeAt(0))
+    const bodyBytes = new TextEncoder().encode(rawBody)
+
+    return crypto.subtle.verify('HMAC', key, sigBytes, bodyBytes)
+  } catch {
+    return false
+  }
+}
+
 // ── Email HTML builder ────────────────────────────────────────────────────────
 
 function buildMagicLinkEmail(opts: {
@@ -106,7 +129,17 @@ function buildMagicLinkEmail(opts: {
 
 serve(async (req) => {
   try {
-    const payload = await req.json()
+    const rawBody = await req.text()
+    const hookSecret = Deno.env.get('SEND_AUTH_EMAIL_HOOK_SECRET')
+    if (hookSecret) {
+      const sig = req.headers.get('x-supabase-signature') ?? ''
+      const valid = await verifyHookSignature(rawBody, sig, hookSecret)
+      if (!valid) {
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 })
+      }
+    }
+
+    const payload = JSON.parse(rawBody)
     const { user, email_data } = payload
 
     if (!user?.email || !email_data?.token_hash) {
