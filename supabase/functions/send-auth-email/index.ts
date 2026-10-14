@@ -156,11 +156,12 @@ serve(async (req) => {
     // Look up the participant's first name and coach name
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-    const { data: person } = await supabase
+    const { data: people } = await supabase
       .from('people')
       .select('name, team_id, teams(created_by)')
       .eq('email', user.email.toLowerCase())
-      .maybeSingle()
+      .limit(1)
+    const person = people?.[0] ?? null
 
     const firstName = person?.name?.split(' ')[0]
       ?? (user.user_metadata?.full_name as string | undefined)?.split(' ')[0]
