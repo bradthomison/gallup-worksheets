@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
 import StrengthBadge from '../components/StrengthBadge'
@@ -905,6 +906,195 @@ function PersonWorksheetPanel({ person, onClose }) {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
+// ── Gallup roster import ──────────────────────────────────────────────────────
+
+function parseGallupExport(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+  const headerIdx = rows.findIndex(r => r.some(c => String(c).trim() === 'First Name'))
+  if (headerIdx === -1) throw new Error("This doesn't look like a Gallup Signature Themes export. Make sure you're uploading the correct file.")
+
+  const headers = rows[headerIdx].map(c => String(c).trim())
+  const firstNameCol = headers.indexOf('First Name')
+  const lastNameCol  = headers.indexOf('Last Name')
+  const emailCol     = headers.indexOf('Email Address')
+  const theme1Col    = headers.indexOf('Theme 1')
+
+  if (emailCol === -1 || theme1Col === -1) throw new Error('Missing expected columns (Email Address, Theme 1). Check the file format.')
+
+  const participants = []
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i]
+    const firstName = String(row[firstNameCol] ?? '').trim()
+    const lastName  = String(row[lastNameCol]  ?? '').trim()
+    const email     = String(row[emailCol]     ?? '').trim().toLowerCase()
+    if (!email || !email.includes('@')) continue
+
+    // Always take only the top 5 — never more, regardless of full-34 exports
+    const top5 = []
+    for (let t = 0; t < 5; t++) {
+      const theme = String(row[theme1Col + t] ?? '').trim()
+      if (theme) top5.push(theme)
+    }
+
+    participants.push({ name: [firstName, lastName].filter(Boolean).join(' '), email, top5 })
+  }
+  return participants
+}
+
+function ImportRosterModal({ teams, onClose, onImported }) {
+  const [step, setStep]             = useState('upload') // upload | preview | importing | done
+  const [participants, setParticipants] = useState([])
+  const [teamId, setTeamId]         = useState('')
+  const [error, setError]           = useState(null)
+  const [results, setResults]       = useState(null)
+  const [dragging, setDragging]     = useState(false)
+  const fileRef = useRef()
+
+  function handleFile(file) {
+    if (!file) return
+    setError(null)
+    const reader = new FileReader()
+    reader.onload = e => {
+      try {
+        const parsed = parseGallupExport(e.target.result)
+        if (parsed.length === 0) { setError('No valid participants found in the file.'); return }
+        setParticipants(parsed)
+        setStep('preview')
+      } catch (err) { setError(err.message) }
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  async function handleImport() {
+    setStep('importing')
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Fetch existing emails in one query to detect duplicates
+    const { data: existing } = await supabase.from('people').select('email')
+    const existingEmails = new Set((existing ?? []).map(p => p.email.toLowerCase()))
+
+    const toInsert = participants.filter(p => !existingEmails.has(p.email))
+    const skipped  = participants.length - toInsert.length
+
+    if (toInsert.length > 0) {
+      await supabase.from('people').insert(
+        toInsert.map(p => ({ name: p.name, email: p.email, top5: p.top5, team_id: teamId || null, created_by: user.id }))
+      )
+    }
+
+    setResults({ imported: toInsert.length, skipped })
+    setStep('done')
+    onImported()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Import from Gallup Roster</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {step === 'upload' && (
+          <>
+            <p className="text-sm text-gray-500">Upload a <strong>Signature Themes Export</strong> (.xlsx) downloaded from Gallup Access. Only the Top 5 themes will be imported.</p>
+            <div
+              onDragOver={e => { e.preventDefault(); setDragging(true) }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}
+              onClick={() => fileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-colors ${dragging ? 'border-brand-400 bg-brand-50' : 'border-gray-300 hover:border-brand-400 hover:bg-gray-50'}`}
+            >
+              <svg className="w-10 h-10 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+              <p className="text-sm font-medium text-gray-700">Drop your Gallup export here</p>
+              <p className="text-xs text-gray-400 mt-1">or click to browse — .xlsx files only</p>
+              <input ref={fileRef} type="file" accept=".xlsx,.xlsm" className="hidden" onChange={e => handleFile(e.target.files[0])} />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </>
+        )}
+
+        {step === 'preview' && (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600"><span className="font-semibold text-gray-900">{participants.length}</span> participants found</p>
+              <button onClick={() => { setStep('upload'); setParticipants([]) }} className="text-xs text-brand-500 hover:underline">Choose different file</button>
+            </div>
+
+            <div className="overflow-auto max-h-64 border border-gray-200 rounded-xl">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Name</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Email</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Top 5</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {participants.map((p, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-900">{p.name}</td>
+                      <td className="px-3 py-2 text-gray-500">{p.email}</td>
+                      <td className="px-3 py-2 text-gray-500">{p.top5.join(', ')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Assign to team <span className="font-normal text-gray-400">(optional)</span></label>
+              <select
+                value={teamId}
+                onChange={e => setTeamId(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">— No team —</option>
+                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={onClose} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleImport} className="flex-1 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 text-sm transition-colors">
+                Import {participants.length} Participants
+              </button>
+            </div>
+          </>
+        )}
+
+        {step === 'importing' && (
+          <div className="py-10 text-center">
+            <p className="text-sm text-gray-500">Importing participants…</p>
+          </div>
+        )}
+
+        {step === 'done' && results && (
+          <>
+            <div className="py-6 text-center space-y-3">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+                <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900">{results.imported} imported</p>
+                {results.skipped > 0 && <p className="text-sm text-gray-500 mt-1">{results.skipped} skipped — already in the system</p>}
+              </div>
+            </div>
+            <button onClick={onClose} className="w-full rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 text-sm transition-colors">Done</button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function ParticipantsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -932,6 +1122,7 @@ export default function ParticipantsPage() {
   const [reports, setReports] = useState([])
   const [pendingRequests, setPendingRequests] = useState([])
   const [approvingId, setApprovingId] = useState(null)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -1151,6 +1342,13 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
           onClose={() => { setAddTeamModal(false); setAddTeamCallback(null) }}
         />
       )}
+      {showImportModal && (
+        <ImportRosterModal
+          teams={teams}
+          onClose={() => setShowImportModal(false)}
+          onImported={() => { setShowImportModal(false); load() }}
+        />
+      )}
       {pendingRequests.length > 0 && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
@@ -1183,6 +1381,13 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
+            Import from Gallup
+          </button>
           <button
             onClick={() => { setAddingNew(true); setAddMode('paste'); setEditingId(null) }}
             className="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"

@@ -354,6 +354,33 @@ export default function TeamPortalPage() {
                 </div>
               </>
             )}
+
+            {/* Team Reports */}
+            {members.some(m => (m.top5 ?? []).some(Boolean)) && (
+              <div className="mt-10">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">Team Reports</h2>
+                <p className="text-sm text-gray-500 mb-4">Reports for the whole team.</p>
+                <div className="grid grid-cols-1 gap-4">
+                  <a
+                    href={`/team-grid?teamId=${teamId}`}
+                    className="flex items-center gap-5 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-2xl px-6 py-5 text-left transition-colors group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-200 transition-colors">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18M10 3v18M14 3v18M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900">Team Strengths Grid</p>
+                      <p className="text-sm text-gray-500 mt-0.5">See all team members and their Top 5 strengths organized by domain.</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400 group-hover:text-brand-500 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>

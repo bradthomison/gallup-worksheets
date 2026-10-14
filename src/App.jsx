@@ -23,6 +23,7 @@ import ParticipantSignInPage from './pages/ParticipantSignInPage'
 import ParticipantDashboardPage from './pages/ParticipantDashboardPage'
 import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
+import TeamGridPage from './pages/TeamGridPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -49,6 +50,7 @@ export default function App() {
       <Route path="/talent-map" element={<TalentMapPage />} />
       <Route path="/sign-in" element={<ParticipantSignInPage />} />
       <Route path="/me" element={<ParticipantDashboardPage />} />
+      <Route path="/team-grid" element={<TeamGridPage />} />
       <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
