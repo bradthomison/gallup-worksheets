@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getStrengthColors } from '../lib/strengthColors'
+import { useEvergreenCells } from '../lib/useEvergreenCells'
 import SiteFooter from '../components/SiteFooter'
 
 const PAGE_1_ROWS = [
@@ -36,7 +37,7 @@ function StrengthColHeader({ strength }) {
   )
 }
 
-function GoalRow({ row, strengths, cells, setCells }) {
+function GoalRow({ row, strengths, cells, updateCell }) {
   return (
     <tr>
       <td className="tm-label-cell border border-gray-200 bg-gray-50 p-3 align-top" style={{ width: '200px' }}>
@@ -51,7 +52,7 @@ function GoalRow({ row, strengths, cells, setCells }) {
         >
           <textarea
             value={cells[`${row.id}||${s}`] ?? ''}
-            onChange={e => setCells(prev => ({ ...prev, [`${row.id}||${s}`]: e.target.value }))}
+            onChange={e => updateCell(`${row.id}||${s}`, e.target.value)}
             className="tm-textarea w-full h-full resize-none p-2 text-xs text-gray-700 bg-transparent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-400"
             style={{ minHeight: '110px' }}
           />
@@ -61,7 +62,7 @@ function GoalRow({ row, strengths, cells, setCells }) {
   )
 }
 
-function TalentTable({ rows, strengths, cells, setCells }) {
+function TalentTable({ rows, strengths, cells, updateCell }) {
   return (
     <div
       className="rounded-2xl border border-gray-200 bg-white"
@@ -87,7 +88,7 @@ function TalentTable({ rows, strengths, cells, setCells }) {
         </thead>
         <tbody>
           {rows.map(row => (
-            <GoalRow key={row.id} row={row} strengths={strengths} cells={cells} setCells={setCells} />
+            <GoalRow key={row.id} row={row} strengths={strengths} cells={cells} updateCell={updateCell} />
           ))}
         </tbody>
       </table>
@@ -103,7 +104,9 @@ export default function TalentMapPage() {
   const [loading, setLoading] = useState(false)
   const [person, setPerson] = useState(null)
   const [error, setError] = useState(null)
-  const [cells, setCells] = useState({})
+  const { cells, setCells, updateCell, saveStatus } = useEvergreenCells(
+    person ? email : '', 'talent-map'
+  )
 
   async function loadData(emailVal) {
     setLoading(true)
@@ -207,7 +210,10 @@ export default function TalentMapPage() {
                   Hi {person.name.split(' ')[0]}! Explore how your Top 5 strengths help you achieve key goals.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {saveStatus === 'saving' && <span className="text-xs text-gray-400">Saving…</span>}
+                {saveStatus === 'saved'  && <span className="text-xs text-green-600">✓ Saved</span>}
+                {saveStatus === 'error'  && <span className="text-xs text-red-500">Save failed</span>}
                 <button
                   onClick={() => window.print()}
                   disabled={strengths.length === 0}
@@ -234,7 +240,7 @@ export default function TalentMapPage() {
 
                 {/* Page 1 */}
                 <div className="tm-page-1 mb-6">
-                  <TalentTable rows={PAGE_1_ROWS} strengths={strengths} cells={cells} setCells={setCells} />
+                  <TalentTable rows={PAGE_1_ROWS} strengths={strengths} cells={cells} updateCell={updateCell} />
                 </div>
 
                 {/* Screen-only page divider */}
@@ -246,7 +252,7 @@ export default function TalentMapPage() {
 
                 {/* Page 2 */}
                 <div className="mb-6">
-                  <TalentTable rows={PAGE_2_ROWS} strengths={strengths} cells={cells} setCells={setCells} />
+                  <TalentTable rows={PAGE_2_ROWS} strengths={strengths} cells={cells} updateCell={updateCell} />
                 </div>
 
                 {/* Instructions (screen only) */}

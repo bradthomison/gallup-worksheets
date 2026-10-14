@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useEvergreenCells } from '../lib/useEvergreenCells'
 import { P2_DEFAULTS, P2_VARIANTS, p2Variant, p2HeaderLines } from '../data/powerOf2'
 import { loadP2Content } from '../lib/powerOf2Content'
 import { getStrengthColors } from '../lib/strengthColors'
@@ -88,7 +89,7 @@ export default function PowerOf2LMSPage() {
   const [error, setError] = useState(null)
   const [partner, setPartner] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
-  const [cells, setCells] = useState({})
+  const { cells, setCells, saveStatus } = useEvergreenCells(person ? email : '', 'power-of-2', variant)
   const [content, setContent] = useState(P2_DEFAULTS[variant])
 
   async function loadData(emailVal, teamId) {
@@ -232,7 +233,10 @@ export default function PowerOf2LMSPage() {
                 <h1 className="text-2xl font-bold text-gray-900">The Power of 2{variant !== 'bring-need' && <span className="text-gray-400 font-medium"> · {variantLabel}</span>}</h1>
                 <p className="text-gray-500 text-sm mt-0.5">Hi {person.name.split(' ')[0]}! Select a partner below to begin.</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {saveStatus === 'saving' && <span className="text-xs text-gray-400">Saving…</span>}
+                {saveStatus === 'saved'  && <span className="text-xs text-green-600">✓ Saved</span>}
+                {saveStatus === 'error'  && <span className="text-xs text-red-500">Save failed</span>}
                 <button
                   onClick={async () => {
                     if (!partner) return

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useEvergreenCells } from '../lib/useEvergreenCells'
 import { getStrengthColors } from '../lib/strengthColors'
 import { downloadPowerOfMePDF } from '../lib/downloadReportPDF'
 import { loadPowerOfMeContent } from '../lib/powerOf2Content'
@@ -23,7 +24,7 @@ export default function PowerOfMeLMSPage() {
   const [person, setPerson] = useState(null)
   const [error, setError] = useState(null)
   const [pdfLoading, setPdfLoading] = useState(false)
-  const [cells, setCells] = useState({})
+  const { cells, setCells, saveStatus } = useEvergreenCells(person ? email : '', 'power-of-me')
   const [content, setContent] = useState({ role: P2_DEFAULTS.role, words: P2_DEFAULTS['descriptive-words'] })
 
   async function loadData(emailVal) {
@@ -130,7 +131,10 @@ export default function PowerOfMeLMSPage() {
                 <h1 className="text-2xl font-bold text-gray-900">The Power of Me</h1>
                 <p className="text-gray-500 text-sm mt-0.5">Hi {person.name.split(' ')[0]}! Explore how your own Top 5 strengths interact.</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {saveStatus === 'saving' && <span className="text-xs text-gray-400">Saving…</span>}
+                {saveStatus === 'saved'  && <span className="text-xs text-green-600">✓ Saved</span>}
+                {saveStatus === 'error'  && <span className="text-xs text-red-500">Save failed</span>}
                 <button
                   onClick={async () => {
                     setPdfLoading(true)
