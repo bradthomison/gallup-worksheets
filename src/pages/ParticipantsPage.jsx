@@ -1631,22 +1631,29 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
                       </td>
                       <td className="px-4 py-3">
                         {team ? (
-                          <span className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full font-medium whitespace-nowrap">
+                          <a
+                            href={`/team/${p.team_id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 hover:border-indigo-200 px-2 py-0.5 rounded-full font-medium whitespace-nowrap transition-colors"
+                          >
                             {team.name}
-                          </span>
+                          </a>
                         ) : (
                           <span className="text-gray-300 text-xs">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="grid gap-1.5" style={{ gridTemplateColumns: 'auto auto' }}>
-                          {(p.top5 ?? []).some(Boolean) ? (
-                            <button
-                              onClick={() => { setInsightsModal(p); setExpandedPersonId(null); setReportsPersonId(null) }}
-                              className="w-full text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
+                          {p.email ? (
+                            <a
+                              href={`/me?hint=${encodeURIComponent(p.email)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full text-center text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
                             >
-                              Personal Insights
-                            </button>
+                              Participant Page
+                            </a>
                           ) : <div />}
                           <button
                             onClick={() => { setEditingId(p.id); setAddingNew(false); setExpandedPersonId(null); setReportsPersonId(null) }}
