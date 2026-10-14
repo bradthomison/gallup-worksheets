@@ -1,7 +1,17 @@
-// Fold layout (landscape 11" × 8.5"):
-//  [left foot ~1"] | [back face ~4.5"] | [front face ~4.5"] | [right foot ~1"]
-// Fold marks at 9.09% (1"), 50%, 90.91% (10")
-// Back face content is rotated 180° so it reads correctly from behind the tent.
+// Name tent layout — letter landscape (11" × 8.5"):
+//
+//  ┌──────┬──────────────────┬──────────────────┬──────┐
+//  │ foot │    left face     │   right face     │ foot │
+//  │  1"  │      4.5"        │      4.5"        │  1"  │
+//  └──────┴──────────────────┴──────────────────┴──────┘
+//   x=1"           x=5.5" (center fold)           x=10"
+//
+// When folded at center, the center fold becomes the TOP of the tent.
+// Each face is 4.5" wide × 8.5" tall on the flat page.
+// The text content (8.5" × 4.5") is placed inside the face panel and
+// rotated 90° so that it reads correctly when the tent is standing:
+//   - Right face: rotate(90deg)  — top of text points LEFT  (toward fold)
+//   - Left face:  rotate(-90deg) — top of text points RIGHT (toward fold)
 
 const DOMAIN_COLOR = {
   Analytical: '#16a34a', Context: '#16a34a', Futuristic: '#16a34a', Ideation: '#16a34a',
@@ -18,50 +28,63 @@ function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function faceHTML(name, strengths) {
-  const rows = strengths.map(s =>
-    `<div style="font-size:20pt;font-weight:800;color:${DOMAIN_COLOR[s] || '#374151'};margin:3px 0;letter-spacing:-0.01em;">${esc(s)}</div>`
+// Build one face panel (4.5" × 8.5" on flat page).
+// Content is a 8.5" × 4.5" box rotated into place so it reads correctly when standing.
+// rotation: 90 for right face, -90 for left face.
+function buildFace(name, strengths, rotation) {
+  const strengthRows = strengths.map(s =>
+    `<div style="font-size:18pt;font-weight:800;color:${DOMAIN_COLOR[s] || '#374151'};margin:2px 0;">${esc(s)}</div>`
   ).join('')
+
   return `
-    <div style="display:flex;flex-direction:column;align-items:center;gap:14px;">
-      <div style="display:flex;flex-direction:column;align-items:center;">${rows}</div>
-      <div style="font-size:44pt;font-weight:900;color:#111827;text-align:center;line-height:1.05;letter-spacing:-0.03em;">${esc(name)}</div>
+    <div style="position:relative;width:4.5in;height:8.5in;flex-shrink:0;overflow:hidden;">
+      <div style="
+        position:absolute;
+        width:8.5in;
+        height:4.5in;
+        top:50%;
+        left:50%;
+        margin-top:-2.25in;
+        margin-left:-4.25in;
+        transform:rotate(${rotation}deg);
+        display:flex;
+        flex-direction:column;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+        padding:0.25in;
+      ">
+        <div style="font-size:40pt;font-weight:900;color:#111827;text-align:center;line-height:1.05;letter-spacing:-0.03em;">${esc(name)}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;margin-top:8px;">
+          ${strengthRows}
+        </div>
+      </div>
     </div>`
 }
 
 function buildTentPage(name, strengths) {
-  const face = faceHTML(name, strengths)
+  // Tick marks at top and bottom edges at each fold line position
+  const tick = (left) => `
+    <div style="position:absolute;left:${left};top:0;height:0.2in;width:1px;background:#555;"></div>
+    <div style="position:absolute;left:${left};bottom:0;height:0.2in;width:1px;background:#555;"></div>`
+
   return `
-    <div class="page">
-      <div class="fold-row">
-        <div class="tick" style="left:9.09%"></div>
-        <div class="tick" style="left:50%"></div>
-        <div class="tick" style="left:90.91%"></div>
-      </div>
-      <div class="panels">
-        <!-- left foot -->
-        <div style="flex:0 0 9.09%;"></div>
-        <!-- back face: same content, rotated 180° so it reads correctly from behind -->
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;transform:rotate(180deg);border-right:1px solid #d1d5db;">
-          ${face}
-        </div>
-        <!-- front face: upright, faces the audience -->
-        <div style="flex:1;display:flex;align-items:center;justify-content:center;border-right:1px solid #d1d5db;">
-          ${face}
-        </div>
-        <!-- right foot -->
-        <div style="flex:0 0 9.09%;"></div>
-      </div>
-      <div class="fold-row">
-        <div class="tick" style="left:9.09%"></div>
-        <div class="tick" style="left:50%"></div>
-        <div class="tick" style="left:90.91%"></div>
-      </div>
+    <div style="position:relative;width:11in;height:8.5in;display:flex;flex-direction:row;page-break-after:always;background:white;">
+      ${tick('1in')}
+      ${tick('5.5in')}
+      ${tick('10in')}
+      <!-- left foot -->
+      <div style="width:1in;flex-shrink:0;"></div>
+      <!-- left face: -90deg so top of text points RIGHT toward center fold -->
+      ${buildFace(name, strengths, -90)}
+      <!-- right face: +90deg so top of text points LEFT toward center fold -->
+      ${buildFace(name, strengths, 90)}
+      <!-- right foot -->
+      <div style="width:1in;flex-shrink:0;"></div>
     </div>`
 }
 
 export function printNameTents(people) {
-  // people: array of { name, top5 }
   const pages = people.map(p => {
     const strengths = (p.top5 ?? []).filter(Boolean)
     return buildTentPage(p.name, strengths)
@@ -72,14 +95,9 @@ export function printNameTents(people) {
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: landscape; margin: 0; }
-  *, *::before, *::after { box-sizing: border-box; }
+  @page { size: letter landscape; margin: 0; }
+  * { box-sizing: border-box; }
   body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: white; }
-  .page { width: 100vw; height: 100vh; display: flex; flex-direction: column; page-break-after: always; }
-  .page:last-child { page-break-after: auto; }
-  .fold-row { height: 12px; position: relative; flex-shrink: 0; }
-  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: #555; transform: translateX(-50%); }
-  .panels { flex: 1; display: flex; }
   @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>
