@@ -338,8 +338,8 @@ export default function TeamSummaryPage() {
                 <BarChart counts={counts} />
               </div>
 
-              {/* Col 2: Spark chart — fills center */}
-              <div className="flex-1 min-w-0">
+              {/* Col 2: Spark chart */}
+              <div className="shrink-0 w-[390px]">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Theme Spark</p>
                 <SparkMini counts={counts} />
               </div>
