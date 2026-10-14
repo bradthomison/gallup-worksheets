@@ -158,7 +158,7 @@ serve(async (req) => {
 
     const { data: people } = await supabase
       .from('people')
-      .select('name, team_id, teams(created_by)')
+      .select('name, team_id, teams!people_team_id_fkey(created_by)')
       .eq('email', user.email.toLowerCase())
       .limit(1)
     const person = people?.[0] ?? null
@@ -169,7 +169,8 @@ serve(async (req) => {
       ?? null
 
     let coachName: string | null = null
-    const coachId = (person?.teams as any)?.created_by ?? null
+    const teamData = (person as any)?.['teams!people_team_id_fkey']
+    const coachId = teamData?.created_by ?? null
     if (coachId) {
       const { data: profile } = await supabase
         .from('profiles')
