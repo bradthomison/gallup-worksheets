@@ -75,10 +75,10 @@ function buildTentPage(name, strengths) {
       ${tick('10in')}
       <!-- left foot -->
       <div style="width:1in;flex-shrink:0;"></div>
-      <!-- left face: -90deg so top of text points RIGHT toward center fold -->
-      ${buildFace(name, strengths, -90)}
-      <!-- right face: +90deg so top of text points LEFT toward center fold -->
+      <!-- left face: +90deg -->
       ${buildFace(name, strengths, 90)}
+      <!-- right face: -90deg -->
+      ${buildFace(name, strengths, -90)}
       <!-- right foot -->
       <div style="width:1in;flex-shrink:0;"></div>
     </div>`
