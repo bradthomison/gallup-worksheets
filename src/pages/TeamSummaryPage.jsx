@@ -431,11 +431,17 @@ export default function TeamSummaryPage() {
                         )
                       })}
                     </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={4} className="px-3 pt-2 pb-1">
+                          <div className="flex justify-between">
+                            <span className="text-xs text-gray-400">Representing the Top 5 Themes</span>
+                            {coachName && <span className="text-xs text-gray-400">Prepared by {coachName}</span>}
+                          </div>
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
-                </div>
-                <div className="flex justify-between items-center mt-2 px-1">
-                  <p className="text-xs text-gray-400">Representing the Top 5 Themes</p>
-                  {coachName && <p className="text-xs text-gray-400">Prepared by {coachName}</p>}
                 </div>
               </div>
             )}
