@@ -441,12 +441,12 @@ export default function SessionPage() {
     setConfirmArchive(false)
   }
 
-  async function openManageModal() {
-    const { data } = await supabase.from('people').select('*').order('name')
-    setManagePeople(data ?? [])
+  function openManageModal() {
     setManagePendingRemove(new Set())
-    setManageAddSelected(new Set())
-    setManageSearch('')
+    setAddSelected(new Set())
+    setAddSearch('')
+    setPasteText('')
+    setAddTab('existing')
     setManageModal(true)
   }
 
@@ -455,10 +455,19 @@ export default function SessionPage() {
     if (managePendingRemove.size > 0) {
       await supabase.from('participants').delete().in('id', [...managePendingRemove])
     }
-    const toAdd = managePeople.filter(p => manageAddSelected.has(p.id))
-    if (toAdd.length > 0) {
+    const fromPeople = people.filter(p => addSelected.has(p.id))
+    const { parsed: fromPaste } = parseParticipants(pasteText)
+    if (fromPaste.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('people').upsert(
+        fromPaste.map(p => ({ name: p.name, email: p.email, top5: p.top5, created_by: user.id })),
+        { onConflict: 'email,created_by' }
+      )
+    }
+    const newParticipants = [...fromPeople, ...fromPaste]
+    if (newParticipants.length > 0) {
       await supabase.from('participants').insert(
-        toAdd.map(p => ({
+        newParticipants.map(p => ({
           session_id: id,
           name: p.name,
           email: p.email,
@@ -472,15 +481,6 @@ export default function SessionPage() {
     setManageModal(false)
     load()
   }
-
-  const manageExistingEmails = new Set(
-    participants.filter(p => !managePendingRemove.has(p.id)).map(p => p.email)
-  )
-  const manageFilteredPeople = managePeople.filter(p => {
-    if (manageExistingEmails.has(p.email)) return false
-    const q = manageSearch.toLowerCase()
-    return !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
-  })
 
   function openNameTents() {
     setNameTentsSelected(new Set(participants.map(p => p.id)))
@@ -643,97 +643,166 @@ export default function SessionPage() {
       {/* Manage Participants modal */}
       {manageModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh]">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between shrink-0">
               <h2 className="text-base font-bold text-gray-900">Manage Participants</h2>
               <button onClick={() => setManageModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
             </div>
 
-            {/* Current participants */}
-            <div className="px-6 pt-3 pb-1">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Current Participants</p>
-            </div>
-            <div className="overflow-y-auto max-h-48 divide-y divide-gray-100 px-2">
-              {participants.map(p => {
-                const removing = managePendingRemove.has(p.id)
-                return (
-                  <div key={p.id} className={`flex items-center justify-between px-4 py-2 ${removing ? 'bg-red-50 opacity-60' : ''}`}>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400">{p.email}</p>
-                    </div>
-                    <button
-                      onClick={() => setManagePendingRemove(prev => {
-                        const next = new Set(prev)
-                        removing ? next.delete(p.id) : next.add(p.id)
-                        return next
-                      })}
-                      className={`text-xs font-medium px-2 py-1 rounded transition-colors ${removing ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}
-                    >{removing ? 'Undo' : 'Remove'}</button>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+              {/* Remove current participants */}
+              {participants.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Current Participants</p>
+                  <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                    {participants.map(p => {
+                      const removing = managePendingRemove.has(p.id)
+                      return (
+                        <div key={p.id} className={`flex items-center justify-between px-4 py-2.5 transition-colors ${removing ? 'bg-red-50' : ''}`}>
+                          <div className={removing ? 'opacity-50' : ''}>
+                            <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                            <p className="text-xs text-gray-400">{p.email}</p>
+                          </div>
+                          <button
+                            onClick={() => setManagePendingRemove(prev => {
+                              const next = new Set(prev)
+                              removing ? next.delete(p.id) : next.add(p.id)
+                              return next
+                            })}
+                            className={`text-xs font-medium px-2.5 py-1 rounded-lg transition-colors ${removing ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}
+                          >{removing ? 'Undo' : 'Remove'}</button>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
-              {participants.length === 0 && (
-                <p className="px-4 py-3 text-sm text-gray-400 italic">No participants yet</p>
+                </div>
               )}
-            </div>
 
-            {/* Add people */}
-            <div className="px-6 pt-3 pb-1 border-t border-gray-100 mt-2">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add People</p>
-              <input
-                type="text"
-                placeholder="Search by name or email…"
-                value={manageSearch}
-                onChange={e => setManageSearch(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
-              />
-            </div>
-            <div className="overflow-y-auto flex-1 divide-y divide-gray-100 px-2 pb-1">
-              {manageFilteredPeople.map(p => {
-                const selected = manageAddSelected.has(p.id)
-                return (
-                  <label key={p.id} className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 rounded-lg">
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => setManageAddSelected(prev => {
-                        const next = new Set(prev)
-                        selected ? next.delete(p.id) : next.add(p.id)
-                        return next
+              {/* Add participants — same picker as edit mode */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Add Participants
+                    {addSelected.size + parseParticipants(pasteText).parsed.length > 0 && (
+                      <span className="ml-2 normal-case font-medium bg-brand-50 text-brand-600 px-2 py-0.5 rounded-full">
+                        {addSelected.size + parseParticipants(pasteText).parsed.length} to add
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex text-xs font-medium rounded-lg border border-gray-200 overflow-hidden">
+                    <button type="button" onClick={() => setAddTab('existing')}
+                      className={`px-3 py-1.5 transition-colors ${addTab === 'existing' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                      Pick existing
+                    </button>
+                    <button type="button" onClick={() => setAddTab('team')}
+                      className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'team' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                      Pick a team
+                    </button>
+                    <button type="button" onClick={() => setAddTab('paste')}
+                      className={`px-3 py-1.5 transition-colors border-l border-gray-200 ${addTab === 'paste' ? 'bg-brand-500 text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+                      Paste new
+                    </button>
+                  </div>
+                </div>
+
+                {addTab === 'existing' && (
+                  filteredPeople.length === 0 && !addSearch ? (
+                    <p className="text-sm text-gray-400 py-2">All participants in your address book are already in this session.</p>
+                  ) : (
+                    <>
+                      <input type="search" value={addSearch} onChange={e => setAddSearch(e.target.value)}
+                        placeholder="Search by name, email, strength, or team…"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                      <div className="max-h-56 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                        {filteredPeople.map(p => (
+                          <label key={p.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${addSelected.has(p.id) ? 'bg-brand-50' : 'hover:bg-gray-50'}`}>
+                            <input type="checkbox" checked={addSelected.has(p.id)} onChange={() => toggleAddSelect(p.id)}
+                              className="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                              <p className="text-xs text-gray-400">{p.email}</p>
+                              {p.team_id && teamMap[p.team_id] && <p className="text-xs text-indigo-500 mt-0.5">{teamMap[p.team_id].name}</p>}
+                            </div>
+                            <div className="flex flex-wrap gap-1 justify-end">
+                              {(p.top5 ?? []).map((s, i) => <StrengthBadge key={i} name={s} />)}
+                            </div>
+                          </label>
+                        ))}
+                        {filteredPeople.length === 0 && addSearch && (
+                          <p className="text-sm text-gray-400 px-4 py-4 text-center">No results.</p>
+                        )}
+                      </div>
+                    </>
+                  )
+                )}
+
+                {addTab === 'team' && (
+                  teams.length === 0 ? (
+                    <p className="text-sm text-gray-400 py-2">No teams yet. Visit the Participants page to create teams.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {teams.map(team => {
+                        const members = people.filter(p => p.team_id === team.id && !existingEmails.has(p.email))
+                        const selectedCount = members.filter(p => addSelected.has(p.id)).length
+                        const allSelected = members.length > 0 && selectedCount === members.length
+                        return (
+                          <div key={team.id} className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-colors ${allSelected ? 'border-brand-200 bg-brand-50' : 'border-gray-200 bg-white'}`}>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900">{team.name}</p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {members.length === 0 ? 'All members already in session'
+                                  : `${members.length} member${members.length !== 1 ? 's' : ''}${selectedCount > 0 && !allSelected ? ` · ${selectedCount} selected` : ''}`}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <button type="button" onClick={() => setAddTeamModal(team)}
+                                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+                                Select individuals
+                              </button>
+                              <button type="button" onClick={() => toggleTeamAdd(team.id)} disabled={members.length === 0}
+                                className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${allSelected ? 'bg-brand-500 text-white border-brand-500 hover:bg-brand-600' : 'bg-white text-brand-600 border-brand-200 hover:bg-brand-50'}`}>
+                                {allSelected ? '✓ All selected' : 'Select all'}
+                              </button>
+                            </div>
+                          </div>
+                        )
                       })}
-                      className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                      <p className="text-xs text-gray-400">{p.email}</p>
                     </div>
-                  </label>
-                )
-              })}
-              {manageFilteredPeople.length === 0 && (
-                <p className="px-4 py-3 text-sm text-gray-400 italic">No people to add{manageSearch ? ' matching that search' : ''}</p>
-              )}
+                  )
+                )}
+
+                {addTab === 'paste' && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-500">One per line: <code className="text-xs bg-gray-100 rounded px-1.5 py-0.5 text-gray-700">Name, Email, S1, S2, S3, S4, S5</code></p>
+                    <textarea value={pasteText} onChange={handlePasteChange} rows={5}
+                      placeholder="Jane Smith, jane@example.com, Achiever, Learner, Relator, Futuristic, Strategic"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y" />
+                    {pasteErrors.length > 0 && (
+                      <ul className="text-xs text-red-600 space-y-0.5">{pasteErrors.map((err, i) => <li key={i}>{err}</li>)}</ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl">
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl shrink-0">
               <span className="text-sm text-gray-500">
                 {managePendingRemove.size > 0 && <span className="text-red-600 font-medium">{managePendingRemove.size} removing</span>}
-                {managePendingRemove.size > 0 && manageAddSelected.size > 0 && <span className="mx-1 text-gray-300">·</span>}
-                {manageAddSelected.size > 0 && <span className="text-green-600 font-medium">{manageAddSelected.size} adding</span>}
-                {managePendingRemove.size === 0 && manageAddSelected.size === 0 && <span>No changes</span>}
+                {managePendingRemove.size > 0 && (addSelected.size + parseParticipants(pasteText).parsed.length) > 0 && <span className="mx-1 text-gray-300">·</span>}
+                {(addSelected.size + parseParticipants(pasteText).parsed.length) > 0 && <span className="text-green-600 font-medium">{addSelected.size + parseParticipants(pasteText).parsed.length} adding</span>}
+                {managePendingRemove.size === 0 && addSelected.size === 0 && parseParticipants(pasteText).parsed.length === 0 && <span>No changes</span>}
               </span>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setManageModal(false)}
-                  className="text-sm text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors"
-                >Cancel</button>
-                <button
-                  onClick={saveManageModal}
-                  disabled={manageSaving || (managePendingRemove.size === 0 && manageAddSelected.size === 0)}
-                  className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
-                >{manageSaving ? 'Saving…' : 'Save'}</button>
+                <button onClick={() => setManageModal(false)}
+                  className="text-sm text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors">
+                  Cancel
+                </button>
+                <button onClick={saveManageModal}
+                  disabled={manageSaving || pasteErrors.length > 0 || (managePendingRemove.size === 0 && addSelected.size === 0 && parseParticipants(pasteText).parsed.length === 0)}
+                  className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors">
+                  {manageSaving ? 'Saving…' : 'Save changes'}
+                </button>
               </div>
             </div>
           </div>
@@ -915,12 +984,6 @@ export default function SessionPage() {
                 title="Download blank print-ready worksheets"
               >↓ Blank PDFs</button>
             )}
-            {/* Manage Participants */}
-            <button
-              onClick={openManageModal}
-              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
-              title="Add or remove participants"
-            >Manage Participants</button>
             {/* Name Tents */}
             <button
               onClick={openNameTents}
@@ -1010,9 +1073,15 @@ export default function SessionPage() {
 
       {/* Participants */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
-        <div className="px-5 py-4 border-b border-gray-100">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Participants</h2>
-          {editing && <p className="text-xs text-gray-400 mt-0.5">Click Remove to drop someone from this session.</p>}
+          {!editing && (
+            <button
+              onClick={openManageModal}
+              className="text-xs font-semibold bg-brand-500 hover:bg-brand-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+            >Manage Participants</button>
+          )}
+          {editing && <p className="text-xs text-gray-400">Click Remove to drop someone from this session.</p>}
         </div>
         {participants.length === 0 ? (
           <p className="text-sm text-gray-500 px-5 py-6">No participants in this session.</p>
