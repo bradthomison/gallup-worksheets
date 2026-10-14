@@ -329,29 +329,24 @@ export default function TeamSummaryPage() {
           </div>
         ) : (
           <>
-            {/* Charts row — 4 columns matching example layout */}
+            {/* Charts row — 3 columns: bar | spark | domain table + pie */}
             <div className="flex gap-5 mb-3 items-start">
 
               {/* Col 1: Bar chart */}
-              <div className="shrink-0 w-[200px]">
+              <div className="shrink-0 w-[220px]">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Strength Distribution</p>
                 <BarChart counts={counts} />
               </div>
 
-              {/* Col 2: Pie chart */}
-              <div className="shrink-0 w-[155px] pt-5">
-                <PieChart domainThemes={domainThemes} />
-              </div>
-
-              {/* Col 3: Spark chart — large */}
-              <div className="shrink-0 w-[370px]">
+              {/* Col 2: Spark chart — fills center */}
+              <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Theme Spark</p>
                 <SparkMini counts={counts} />
               </div>
 
-              {/* Col 4: Domain breakdown table */}
-              <div className="flex-1 min-w-0 pt-5">
-                <table className="w-full text-xs border-collapse">
+              {/* Col 3: Domain table + pie below */}
+              <div className="shrink-0 w-[180px] pt-5">
+                <table className="w-full text-xs border-collapse mb-4">
                   <thead>
                     <tr>
                       <th className="text-left pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide">Domain</th>
@@ -364,8 +359,8 @@ export default function TeamSummaryPage() {
                       const d = DOMAINS[key]
                       return (
                         <tr key={key}>
-                          <td className="py-1.5 pr-2">
-                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold"
+                          <td className="py-1.5 pr-1">
+                            <span className="inline-flex px-1.5 py-0.5 rounded text-xs font-semibold"
                               style={{ backgroundColor: d.headerBg, color: d.headerText }}>
                               {DOMAIN_LABELS[key]}
                             </span>
@@ -384,6 +379,7 @@ export default function TeamSummaryPage() {
                     </tr>
                   </tbody>
                 </table>
+                <PieChart domainThemes={domainThemes} />
               </div>
 
             </div>
