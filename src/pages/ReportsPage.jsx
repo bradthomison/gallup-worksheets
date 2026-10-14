@@ -5,7 +5,7 @@ import ReportContentByStrength from '../components/ReportContentByStrength'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
 import { P2_VARIANTS, P2_VARIANT_ORDER, P2_DEFAULTS, p2Path } from '../data/powerOf2'
-import { loadPowerOfMeContent } from '../lib/powerOf2Content'
+
 
 const ALL_STRENGTHS = Object.keys(PERSONAL_INSIGHTS).sort()
 
@@ -415,124 +415,134 @@ function CopyLinkRow({ label, url, active, onEdit }) {
   )
 }
 
-// The Power of Me reuses two of the Power of 2 texts: The Role I Play (column headers) and
-// Descriptive Words (row headers). This editor shows just those two boxes per strength.
-const POM_FIELDS = [
-  { id: 'role',  reportType: P2_VARIANTS.role.reportType,                 key: 'roleIPlay',        label: 'The Role I Play (column headers)' },
-  { id: 'words', reportType: P2_VARIANTS['descriptive-words'].reportType, key: 'descriptiveWords', label: 'Descriptive Words (row headers)' },
+// All 5 P2 content fields, covering every variant and Power of Me.
+const P2_ALL_FIELDS = [
+  { key: 'bring',            reportType: P2_VARIANTS['bring-need'].reportType,        label: 'I Bring…',          rows: 3, variant: 'bring-need' },
+  { key: 'need',             reportType: P2_VARIANTS['bring-need'].reportType,        label: 'I Need…',           rows: 3, variant: 'bring-need' },
+  { key: 'descriptiveWords', reportType: P2_VARIANTS['descriptive-words'].reportType, label: 'Descriptive Words', rows: 2, variant: 'descriptive-words' },
+  { key: 'description',      reportType: P2_VARIANTS['short-description'].reportType, label: 'Short Description', rows: 3, variant: 'short-description' },
+  { key: 'roleIPlay',        reportType: P2_VARIANTS.role.reportType,                 label: 'The Role I Play',   rows: 2, variant: 'role' },
 ]
-const POM_DEFAULTS = { role: P2_DEFAULTS.role, words: P2_DEFAULTS['descriptive-words'] }
+const P2_UNIQUE_REPORT_TYPES = [...new Set(P2_ALL_FIELDS.map(f => f.reportType))]
 
-function PowerOfMeEditor({ refreshKey, onSaved: onContentSaved }) {
+function P2UnifiedEditor({ refreshKey, onSaved: onContentSaved }) {
   const [selectedStrength, setSelectedStrength] = useState('Activator')
-  const [saved, setSaved] = useState(null) // { role: {strength: {roleIPlay}}, words: {...} }
+  const [dbContent, setDbContent] = useState(null)
   const [editFields, setEditFields] = useState({})
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [error, setError] = useState(null)
 
-  useEffect(() => { loadPowerOfMeContent().then(setSaved) }, [refreshKey])
+  const loadContent = useCallback(async () => {
+    const results = await Promise.all(
+      P2_UNIQUE_REPORT_TYPES.map(rt =>
+        supabase.from('report_content').select('strength_name, content').eq('report_type', rt)
+          .then(({ data }) => [rt, data ?? []])
+      )
+    )
+    const byType = Object.fromEntries(results)
+    const merged = {}
+    ALL_STRENGTHS.forEach(s => {
+      merged[s] = {}
+      P2_ALL_FIELDS.forEach(f => {
+        const row = byType[f.reportType]?.find(d => d.strength_name === s)
+        merged[s][f.key] = row?.content?.[f.key] ?? P2_DEFAULTS[f.variant]?.[s]?.[f.key] ?? ''
+      })
+    })
+    setDbContent(merged)
+  }, [refreshKey])
+
+  useEffect(() => { loadContent() }, [loadContent])
 
   useEffect(() => {
-    if (!saved) return
-    const next = {}
-    POM_FIELDS.forEach(f => { next[f.id] = saved[f.id][selectedStrength]?.[f.key] ?? '' })
-    setEditFields(next)
+    if (!dbContent) return
+    setEditFields({ ...dbContent[selectedStrength] })
     setJustSaved(false)
     setError(null)
-  }, [selectedStrength, saved])
+  }, [selectedStrength, dbContent])
 
   async function handleSave() {
     setSaving(true)
     setError(null)
-    const { error: err } = await supabase.from('report_content').upsert(
-      POM_FIELDS.map(f => ({
-        report_type: f.reportType,
-        strength_name: selectedStrength,
-        content: { [f.key]: editFields[f.id] ?? '' },
-        updated_at: new Date().toISOString(),
-      })),
-      { onConflict: 'report_type,strength_name' }
-    )
+    const byType = {}
+    P2_ALL_FIELDS.forEach(f => {
+      if (!byType[f.reportType]) byType[f.reportType] = {}
+      byType[f.reportType][f.key] = editFields[f.key] ?? ''
+    })
+    const rows = Object.entries(byType).map(([rt, content]) => ({
+      report_type: rt,
+      strength_name: selectedStrength,
+      content,
+      updated_at: new Date().toISOString(),
+    }))
+    const { error: err } = await supabase.from('report_content').upsert(rows, { onConflict: 'report_type,strength_name' })
     setSaving(false)
     if (err) { setError(err.message); return }
-    setSaved(prev => {
-      const next = { ...prev }
-      POM_FIELDS.forEach(f => {
-        next[f.id] = { ...prev[f.id], [selectedStrength]: { ...prev[f.id][selectedStrength], [f.key]: editFields[f.id] ?? '' } }
-      })
-      return next
-    })
+    setDbContent(prev => ({ ...prev, [selectedStrength]: { ...editFields } }))
     setJustSaved(true)
     setTimeout(() => setJustSaved(false), 2500)
     onContentSaved?.()
   }
 
   function handleReset() {
-    const next = {}
-    POM_FIELDS.forEach(f => { next[f.id] = POM_DEFAULTS[f.id][selectedStrength]?.[f.key] ?? '' })
-    setEditFields(next)
+    const defaults = {}
+    P2_ALL_FIELDS.forEach(f => { defaults[f.key] = P2_DEFAULTS[f.variant]?.[selectedStrength]?.[f.key] ?? '' })
+    setEditFields(defaults)
   }
+
+  if (!dbContent) return <p className="text-sm text-gray-400 px-4 py-6">Loading…</p>
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100">
         <p className="text-sm font-semibold text-gray-800">Edit Strength Content</p>
-        <p className="text-xs text-gray-400 mt-0.5">
-          These are the same texts used by the Power of 2 "The Role I Play" and "Descriptive Words" versions, so edits carry over to both.
-        </p>
+        <p className="text-xs text-gray-400 mt-0.5">Changes here apply across all Power of 2 variants and Power of Me.</p>
       </div>
-      {!saved ? (
-        <p className="text-sm text-gray-400 px-4 py-6">Loading…</p>
-      ) : (
-        <div className="p-4 space-y-4">
-          <div className="flex items-center gap-3">
-            <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select strength:</label>
-            <select
-              value={selectedStrength}
-              onChange={e => setSelectedStrength(e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
-            >
-              {ALL_STRENGTHS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="space-y-3">
-            {POM_FIELDS.map(f => (
-              <div key={f.id}>
-                <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
-                <textarea
-                  value={editFields[f.id] ?? ''}
-                  onChange={e => setEditFields(prev => ({ ...prev, [f.id]: e.target.value }))}
-                  rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
-            >
-              {saving ? 'Saving…' : `Save ${selectedStrength}`}
-            </button>
-            <button onClick={handleReset} className="text-sm text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg transition-colors">
-              Reset to default
-            </button>
-            {justSaved && <span className="text-sm text-green-600">✓ Saved</span>}
-            {error && <span className="text-sm text-red-600">{error}</span>}
-          </div>
+      <div className="p-4 space-y-4">
+        <div className="flex items-center gap-3">
+          <label className="text-xs font-medium text-gray-600 whitespace-nowrap">Select strength:</label>
+          <select
+            value={selectedStrength}
+            onChange={e => setSelectedStrength(e.target.value)}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+          >
+            {ALL_STRENGTHS.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
         </div>
-      )}
+        <div className="space-y-3">
+          {P2_ALL_FIELDS.map(f => (
+            <div key={f.key}>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{f.label}</label>
+              <textarea
+                value={editFields[f.key] ?? ''}
+                onChange={e => setEditFields(prev => ({ ...prev, [f.key]: e.target.value }))}
+                rows={f.rows}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-y"
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+          >
+            {saving ? 'Saving…' : `Save ${selectedStrength}`}
+          </button>
+          <button onClick={handleReset} className="text-sm text-gray-500 hover:text-gray-800 px-3 py-2 rounded-lg transition-colors">
+            Reset to default
+          </button>
+          {justSaved && <span className="text-sm text-green-600">✓ Saved</span>}
+          {error && <span className="text-sm text-red-600">{error}</span>}
+        </div>
+      </div>
     </div>
   )
 }
 
 function PowerOf2Report({ refreshKey, onContentSaved }) {
   const [expanded, setExpanded] = useState(false)
-  const [variant, setVariant] = useState('bring-need') // a Power of 2 variant, or 'power-of-me'
-  const editingMe = variant === 'power-of-me'
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -568,32 +578,14 @@ function PowerOf2Report({ refreshKey, onContentSaved }) {
                 key={v}
                 label={`Acorn Course Link · The Power of 2 · ${P2_VARIANTS[v].label}`}
                 url={`${window.location.origin}${p2Path(v)}`}
-                active={v === variant}
-                onEdit={() => setVariant(v)}
               />
             ))}
             <CopyLinkRow
               label="Acorn Course Link · The Power of Me"
               url={`${window.location.origin}/power-of-me`}
-              active={editingMe}
-              onEdit={() => setVariant('power-of-me')}
             />
           </div>
-          <p className="text-xs text-gray-500">
-            Editing: <span className="font-semibold text-gray-700">{editingMe ? 'The Power of Me' : P2_VARIANTS[variant].label}</span>
-          </p>
-          {editingMe ? (
-            <PowerOfMeEditor refreshKey={refreshKey} onSaved={onContentSaved} />
-          ) : (
-            <StrengthContentEditor
-              key={variant}
-              reportType={P2_VARIANTS[variant].reportType}
-              staticFallback={P2_DEFAULTS[variant]}
-              fieldLabels={P2_VARIANTS[variant].fieldLabels}
-              refreshKey={refreshKey}
-              onSaved={onContentSaved}
-            />
-          )}
+          <P2UnifiedEditor refreshKey={refreshKey} onSaved={onContentSaved} />
         </div>
       )}
     </div>
