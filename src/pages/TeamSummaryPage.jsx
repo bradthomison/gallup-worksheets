@@ -186,11 +186,11 @@ function BarChart({ counts }) {
   if (!entries.length) return null
 
   const maxCount = entries[0][1]
-  const LABEL_W = 118
-  const BAR_MAX = 110
-  const COUNT_W = 18
-  const ROW_H = 17
-  const W = LABEL_W + BAR_MAX + COUNT_W + 8
+  const LABEL_W = 88
+  const BAR_MAX = 58
+  const COUNT_W = 12
+  const ROW_H = 8
+  const W = LABEL_W + BAR_MAX + COUNT_W + 6
   const H = entries.length * ROW_H + 4
 
   return (
@@ -202,13 +202,13 @@ function BarChart({ counts }) {
         const y = i * ROW_H
         return (
           <g key={name}>
-            <text x={LABEL_W - 3} y={y + ROW_H / 2 + 3.5} fontSize="9"
+            <text x={LABEL_W - 3} y={y + ROW_H / 2 + 2.5} fontSize="6.5"
               textAnchor="end" fill="#374151" fontFamily="Arial, sans-serif">
               {name}
             </text>
-            <rect x={LABEL_W} y={y + 3} width={Math.max(barW, 2)} height={ROW_H - 7}
-              rx={2} fill={d.headerBg} opacity={0.85} />
-            <text x={LABEL_W + barW + 4} y={y + ROW_H / 2 + 3.5} fontSize="9"
+            <rect x={LABEL_W} y={y + 1.5} width={Math.max(barW, 2)} height={ROW_H - 4}
+              rx={1.5} fill={d.headerBg} opacity={0.85} />
+            <text x={LABEL_W + barW + 3} y={y + ROW_H / 2 + 2.5} fontSize="6.5"
               fill={d.text} fontFamily="Arial, sans-serif" fontWeight="bold">
               {count}
             </text>
@@ -289,7 +289,7 @@ export default function TeamSummaryPage() {
     <div className="min-h-screen bg-white flex flex-col">
       <style>{`
         @media print {
-          @page { size: landscape; margin: 0.5cm; }
+          @page { size: letter portrait; margin: 0.6cm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .no-print { display: none !important; }
         }
@@ -310,10 +310,10 @@ export default function TeamSummaryPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-6">
 
         {/* Page title */}
-        <div className="flex items-baseline justify-between mb-6">
+        <div className="flex items-baseline justify-between mb-4">
           <div>
             <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest">Team Summary</p>
             <h1 className="text-2xl font-bold text-gray-900">{team.name}</h1>
@@ -328,60 +328,65 @@ export default function TeamSummaryPage() {
         ) : (
           <>
             {/* Charts row */}
-            <div className="flex gap-8 mb-8 items-start">
+            <div className="flex gap-6 mb-6 items-start">
 
-              {/* Left: horizontal bar chart */}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Strength Distribution</p>
+              {/* Left: horizontal bar chart — compact */}
+              <div className="shrink-0 w-[175px]">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Strength Distribution</p>
                 <BarChart counts={counts} />
               </div>
 
-              {/* Right: spark + pie + domain table */}
-              <div className="shrink-0 w-80 space-y-5">
-                <div>
+              {/* Right: spark + pie + domain table side by side */}
+              <div className="flex-1 min-w-0 flex gap-5 items-start">
+
+                {/* Spark */}
+                <div className="shrink-0 w-[260px]">
                   <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Theme Spark</p>
                   <SparkMini counts={counts} />
                 </div>
 
-                <div className="flex gap-4 items-start">
-                  <PieChart domainThemes={domainThemes} />
-
-                  <div className="flex-1 pt-1">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr>
-                          <th className="text-left pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide">Domain</th>
-                          <th className="text-center pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide px-2">People</th>
-                          <th className="text-center pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide">Themes</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {DOMAIN_KEYS.map(key => {
-                          const d = DOMAINS[key]
-                          return (
-                            <tr key={key}>
-                              <td className="py-1.5 pr-2">
-                                <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold"
-                                  style={{ backgroundColor: d.headerBg, color: d.headerText }}>
-                                  {DOMAIN_LABELS[key]}
-                                </span>
-                              </td>
-                              <td className="text-center py-1.5 px-2 font-semibold text-gray-700">{domainPeople[key].size}</td>
-                              <td className="text-center py-1.5 font-semibold text-gray-700">{domainThemes[key]}</td>
-                            </tr>
-                          )
-                        })}
-                        <tr className="border-t-2 border-gray-200">
-                          <td className="pt-1.5 text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</td>
-                          <td className="text-center pt-1.5 font-bold text-gray-900 px-2">{members.length}</td>
-                          <td className="text-center pt-1.5 font-bold text-gray-900">
-                            {Object.values(domainThemes).reduce((a, b) => a + b, 0)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {/* Pie + domain table */}
+                <div className="flex-1 min-w-0 pt-5">
+                  <div className="flex gap-3 items-start">
+                    <PieChart domainThemes={domainThemes} />
+                    <div className="flex-1 pt-1">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr>
+                            <th className="text-left pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide">Domain</th>
+                            <th className="text-center pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide px-2">People</th>
+                            <th className="text-center pb-1.5 text-gray-400 font-semibold text-xs uppercase tracking-wide">Themes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {DOMAIN_KEYS.map(key => {
+                            const d = DOMAINS[key]
+                            return (
+                              <tr key={key}>
+                                <td className="py-1.5 pr-2">
+                                  <span className="inline-flex px-2 py-0.5 rounded text-xs font-semibold"
+                                    style={{ backgroundColor: d.headerBg, color: d.headerText }}>
+                                    {DOMAIN_LABELS[key]}
+                                  </span>
+                                </td>
+                                <td className="text-center py-1.5 px-2 font-semibold text-gray-700">{domainPeople[key].size}</td>
+                                <td className="text-center py-1.5 font-semibold text-gray-700">{domainThemes[key]}</td>
+                              </tr>
+                            )
+                          })}
+                          <tr className="border-t-2 border-gray-200">
+                            <td className="pt-1.5 text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</td>
+                            <td className="text-center pt-1.5 font-bold text-gray-900 px-2">{members.length}</td>
+                            <td className="text-center pt-1.5 font-bold text-gray-900">
+                              {Object.values(domainThemes).reduce((a, b) => a + b, 0)}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -393,10 +398,10 @@ export default function TeamSummaryPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 w-40">Strength</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">As a team we bring</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">As a team we need</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">As a team we are motivated by</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-36">Strength</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we bring</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we need</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we are motivated by</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -407,18 +412,18 @@ export default function TeamSummaryPage() {
                         const phrases = TEAM_SUMMARY_PHRASES[name] || {}
                         return (
                           <tr key={name} className="hover:bg-gray-50">
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-400 w-8 shrink-0">{pct}%</span>
-                                <span className="font-bold text-sm px-2 py-0.5 rounded"
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-gray-400 w-7 shrink-0">{pct}%</span>
+                                <span className="font-bold text-xs px-2 py-0.5 rounded"
                                   style={{ backgroundColor: d.bg, color: d.text }}>
                                   {name}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-xs text-gray-600">{phrases.bring || ''}</td>
-                            <td className="px-4 py-3 text-xs text-gray-600">{phrases.need || ''}</td>
-                            <td className="px-4 py-3 text-xs text-gray-600">{phrases.motivated_by || ''}</td>
+                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.bring || ''}</td>
+                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.need || ''}</td>
+                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.motivated_by || ''}</td>
                           </tr>
                         )
                       })}
