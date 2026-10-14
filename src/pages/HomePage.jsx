@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import Layout from '../components/Layout'
 
 const NAV_ITEMS = [
@@ -89,6 +91,21 @@ const NAV_ITEMS = [
 ]
 
 export default function HomePage() {
+  const [qrDataUrl, setQrDataUrl] = useState(null)
+  const signInUrl = `${window.location.origin}/sign-in`
+
+  useEffect(() => {
+    QRCode.toDataURL(signInUrl, { width: 400, margin: 2, color: { dark: '#111827', light: '#ffffff' } })
+      .then(setQrDataUrl)
+  }, [signInUrl])
+
+  function downloadQR() {
+    const a = document.createElement('a')
+    a.href = qrDataUrl
+    a.download = 'participant-sign-in-qr.png'
+    a.click()
+  }
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto">
@@ -114,6 +131,38 @@ export default function HomePage() {
             </Link>
           ))}
         </div>
+
+        {/* Participant sign-in QR code */}
+        <div className="mt-8 bg-white rounded-2xl border border-gray-200 shadow-sm p-6 flex items-center gap-8">
+          <div className="shrink-0">
+            {qrDataUrl
+              ? <img src={qrDataUrl} alt="Participant sign-in QR code" className="w-28 h-28" />
+              : <div className="w-28 h-28 bg-gray-100 rounded-lg animate-pulse" />
+            }
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-gray-900 mb-1">Participant Sign-In QR</h2>
+            <p className="text-sm text-gray-500 mb-4">Download and insert into your presentation. Participants scan it to access their strengths dashboard.</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={downloadQR}
+                disabled={!qrDataUrl}
+                className="text-sm font-semibold bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                ↓ Download PNG
+              </button>
+              <a
+                href={signInUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                {signInUrl}
+              </a>
+            </div>
+          </div>
+        </div>
+
       </div>
     </Layout>
   )
