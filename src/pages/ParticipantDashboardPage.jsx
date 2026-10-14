@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { getStrengthColors, STRENGTH_DOMAIN } from '../lib/strengthColors'
 import SiteFooter from '../components/SiteFooter'
+import { printNameTents } from '../lib/printNameTent'
 
 const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
@@ -292,45 +293,8 @@ export default function ParticipantDashboardPage() {
   }
 
   function printMyNameTent(person) {
-    const strengths = (person.top5 ?? []).filter(Boolean)
-    if (!strengths.length) return
-    const domainColor = {
-      Analytical: '#16a34a', Context: '#16a34a', Futuristic: '#16a34a', Ideation: '#16a34a',
-      Input: '#16a34a', Intellection: '#16a34a', Learner: '#16a34a', Strategic: '#16a34a',
-      Activator: '#ea580c', Command: '#ea580c', Communication: '#ea580c', Competition: '#ea580c',
-      Maximizer: '#ea580c', 'Self-Assurance': '#ea580c', Significance: '#ea580c', Woo: '#ea580c',
-      Adaptability: '#2563eb', Connectedness: '#2563eb', Developer: '#2563eb', Empathy: '#2563eb',
-      Harmony: '#2563eb', Includer: '#2563eb', Individualization: '#2563eb', Positivity: '#2563eb', Relator: '#2563eb',
-      Achiever: '#7c3aed', Arranger: '#7c3aed', Belief: '#7c3aed', Consistency: '#7c3aed',
-      Deliberative: '#7c3aed', Discipline: '#7c3aed', Focus: '#7c3aed', Responsibility: '#7c3aed', Restorative: '#7c3aed',
-    }
-    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
-    const rows = strengths.map(s => `<div style="font-size:19pt;font-weight:800;color:${domainColor[s]||'#374151'};margin:3px 0;">${esc(s)}</div>`).join('')
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-      @page{size:landscape;margin:0}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:white}
-      .page{width:100vw;height:100vh;display:flex;flex-direction:column}
-      .fold-row{height:12px;position:relative;flex-shrink:0}
-      .tick{position:absolute;top:0;bottom:0;width:1px;background:#555;transform:translateX(-50%)}
-      .panels{flex:1;display:flex}
-      .panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px}
-      .sep{border-left:1px solid #d1d5db;border-right:1px solid #d1d5db}
-      .slist{display:flex;flex-direction:column;align-items:center}
-      .name{font-size:46pt;font-weight:900;color:#111827;text-align:center;line-height:1.05;letter-spacing:-0.03em}
-      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-    </style></head><body>
-    <div class="page">
-      <div class="fold-row"><div class="tick" style="left:33.333%"></div><div class="tick" style="left:66.666%"></div></div>
-      <div class="panels">
-        <div class="panel" style="transform:rotate(180deg)"><div class="slist">${rows}</div></div>
-        <div class="panel sep" style="transform:rotate(180deg)"><div class="name">${esc(person.name)}</div></div>
-        <div class="panel"><div class="slist">${rows}</div><div class="name" style="margin-top:18px">${esc(person.name)}</div></div>
-      </div>
-      <div class="fold-row"><div class="tick" style="left:33.333%"></div><div class="tick" style="left:66.666%"></div></div>
-    </div>
-    <script>window.addEventListener('load',function(){window.print()})</script>
-    </body></html>`
-    const win = window.open('', '_blank')
-    win.document.open(); win.document.write(html); win.document.close()
+    if (!(person.top5 ?? []).some(Boolean)) return
+    printNameTents([person])
   }
 
   // ── Loading ──────────────────────────────────────────────────────────────────
