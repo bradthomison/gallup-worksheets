@@ -66,7 +66,7 @@ function buildTentPage(name, strengths, breakAfter) {
     <div style="position:absolute;left:${left};bottom:0;height:0.2in;width:1px;background:#555;"></div>`
 
   return `
-    <div style="position:relative;width:11in;height:8.5in;${breakAfter ? 'page-break-after:always;' : ''}background:white;">
+    <div style="position:relative;width:100vw;height:100vh;overflow:hidden;${breakAfter ? 'page-break-after:always;' : ''}background:white;">
       ${tick('1in')}
       ${tick('5.5in')}
       ${tick('10in')}
@@ -87,9 +87,10 @@ export function printNameTents(people) {
 <meta charset="utf-8">
 <style>
   @page { size: letter landscape; margin: 0; }
+  html, body { margin: 0; padding: 0; overflow: hidden; font-family: Arial, Helvetica, sans-serif; background: white; }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: white; }
   @media print {
+    html, body { overflow: hidden; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
