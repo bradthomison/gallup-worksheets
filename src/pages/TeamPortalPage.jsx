@@ -275,14 +275,14 @@ export default function TeamPortalPage() {
     if (card.action === 'p2modal') {
       setShowP2Modal(true)
     } else {
-      navigate(card.href)
+      window.open(card.href, '_blank', 'noopener,noreferrer')
     }
   }
 
   function handleP2Select(variant) {
     setShowP2Modal(false)
     const email = encodeURIComponent(selected.email)
-    navigate(`${p2Path(variant)}?email=${email}&teamId=${teamId}`)
+    window.open(`${p2Path(variant)}?email=${email}&teamId=${teamId}`, '_blank', 'noopener,noreferrer')
   }
 
   if (loading) {
@@ -524,7 +524,7 @@ export default function TeamPortalPage() {
                   {worksheets.map(ws => (
                     <button
                       key={ws.participant_id}
-                      onClick={() => navigate(`/worksheet/${ws.slug}`)}
+                      onClick={() => window.open(`/worksheet/${ws.slug}`, '_blank', 'noopener,noreferrer')}
                       className="flex items-center gap-4 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-2xl px-5 py-4 text-left transition-colors group"
                     >
                       <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-200 transition-colors">
