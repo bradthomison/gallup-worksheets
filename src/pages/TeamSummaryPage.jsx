@@ -309,10 +309,10 @@ export default function TeamSummaryPage() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-screen-xl mx-auto w-full px-4 sm:px-6 py-3">
 
         {/* Page title */}
-        <div className="flex items-baseline justify-between mb-4">
+        <div className="flex items-baseline justify-between mb-2">
           <div>
             <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest">Team Summary</p>
             <h1 className="text-2xl font-bold text-gray-900">{team.name}</h1>
@@ -327,7 +327,7 @@ export default function TeamSummaryPage() {
         ) : (
           <>
             {/* Charts row — 4 columns matching example layout */}
-            <div className="flex gap-5 mb-5 items-start">
+            <div className="flex gap-5 mb-3 items-start">
 
               {/* Col 1: Bar chart */}
               <div className="shrink-0 w-[200px]">
@@ -349,7 +349,7 @@ export default function TeamSummaryPage() {
               </div>
 
               {/* Col 3: Spark chart — large */}
-              <div className="shrink-0 w-[420px]">
+              <div className="shrink-0 w-[370px]">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Theme Spark</p>
                 <SparkMini counts={counts} />
               </div>
@@ -396,15 +396,15 @@ export default function TeamSummaryPage() {
             {/* Team Top 5 table */}
             {teamTop5.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Team Top 5</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Team Top 5</p>
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 w-36">Strength</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we bring</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we need</th>
-                        <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">As a team we are motivated by</th>
+                        <th className="px-3 py-1.5 text-left text-xs font-semibold text-gray-500 w-36">Strength</th>
+                        <th className="px-3 py-1.5 text-left text-xs font-semibold text-gray-500">As a team we bring</th>
+                        <th className="px-3 py-1.5 text-left text-xs font-semibold text-gray-500">As a team we need</th>
+                        <th className="px-3 py-1.5 text-left text-xs font-semibold text-gray-500">As a team we are motivated by</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -415,7 +415,7 @@ export default function TeamSummaryPage() {
                         const phrases = TEAM_SUMMARY_PHRASES[name] || {}
                         return (
                           <tr key={name} className="hover:bg-gray-50">
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-1.5">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-xs text-gray-400 w-7 shrink-0">{pct}%</span>
                                 <span className="font-bold text-xs px-2 py-0.5 rounded"
@@ -424,16 +424,16 @@ export default function TeamSummaryPage() {
                                 </span>
                               </div>
                             </td>
-                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.bring || ''}</td>
-                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.need || ''}</td>
-                            <td className="px-3 py-2 text-xs text-gray-600">{phrases.motivated_by || ''}</td>
+                            <td className="px-3 py-1.5 text-xs text-gray-600">{phrases.bring || ''}</td>
+                            <td className="px-3 py-1.5 text-xs text-gray-600">{phrases.need || ''}</td>
+                            <td className="px-3 py-1.5 text-xs text-gray-600">{phrases.motivated_by || ''}</td>
                           </tr>
                         )
                       })}
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={4} className="px-3 pt-2 pb-1">
+                        <td colSpan={4} className="px-3 pt-1 pb-1">
                           <div className="flex justify-between">
                             <span className="text-xs text-gray-400">Representing the Top 5 Themes</span>
                             {coachName && <span className="text-xs text-gray-400">Prepared by {coachName}</span>}
