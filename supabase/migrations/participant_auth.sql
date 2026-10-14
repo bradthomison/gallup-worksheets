@@ -57,36 +57,17 @@ begin
     return json_build_object('error', 'not_authenticated');
   end if;
 
+  -- Profile data lives in the people table (name, top5, team_id)
   select json_build_object(
     'name',    p.name,
     'email',   lower(p.email),
     'top5',    p.top5,
-    'team_id', s.team_id
+    'team_id', p.team_id
   )
   into v_result
-  from participants p
-  join sessions    s on s.id = p.session_id
+  from people p
   where lower(p.email) = lower(v_email)
-    and p.top5 is not null
-    and array_length(p.top5, 1) > 0
-  order by p.created_at desc
   limit 1;
-
-  if not found then
-    -- Participant exists but may not have strengths entered yet
-    select json_build_object(
-      'name',    p.name,
-      'email',   lower(p.email),
-      'top5',    p.top5,
-      'team_id', s.team_id
-    )
-    into v_result
-    from participants p
-    join sessions    s on s.id = p.session_id
-    where lower(p.email) = lower(v_email)
-    order by p.created_at desc
-    limit 1;
-  end if;
 
   if not found then
     return json_build_object('error', 'not_found');
