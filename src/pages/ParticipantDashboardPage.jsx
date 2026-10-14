@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { getStrengthColors, STRENGTH_DOMAIN } from '../lib/strengthColors'
@@ -233,6 +233,10 @@ function RequestAccessForm({ userEmail, onSubmitted }) {
 export default function ParticipantDashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const coachViewEmail = searchParams.get('as') // coach previewing a specific participant
+  const isCoachView = Boolean(coachViewEmail)
+
   const [profile, setProfile] = useState(null)
   const [profileState, setProfileState] = useState('loading') // 'loading' | 'found' | 'not_found' | 'pending' | 'error'
   const [worksheets, setWorksheets] = useState([])
@@ -250,6 +254,21 @@ export default function ParticipantDashboardPage() {
     if (!user) return
     async function load() {
       setProfileState('loading')
+      if (isCoachView) {
+        // Coach previewing a participant — load directly from people table
+        const { data: person } = await supabase
+          .from('people')
+          .select('id, name, email, top5, team_id, approved')
+          .ilike('email', coachViewEmail)
+          .single()
+        if (!person) { setProfileState('not_found'); return }
+        const isTeamManager = person.team_id
+          ? (await supabase.from('teams').select('id').eq('manager_id', person.id).eq('id', person.team_id).maybeSingle()).data !== null
+          : false
+        setProfile({ ...person, is_team_manager: isTeamManager })
+        setProfileState('found')
+        return
+      }
       await supabase.rpc('link_participant_account')
       const { data } = await supabase.rpc('get_my_participant_profile')
       if (!data || data.error === 'not_authenticated') {
@@ -265,7 +284,7 @@ export default function ParticipantDashboardPage() {
       }
     }
     load()
-  }, [user])
+  }, [user, coachViewEmail])
 
   useEffect(() => {
     if (profileState !== 'found' || !profile?.team_id) return
@@ -278,8 +297,16 @@ export default function ParticipantDashboardPage() {
   useEffect(() => {
     if (profileState !== 'found') return
     setReportsLoading(true)
-    supabase.rpc('get_my_reports')
-      .then(({ data }) => { setReports(data ?? []); setReportsLoading(false) })
+    if (isCoachView && profile?.team_id) {
+      supabase.from('reports').select('id, name').eq('team_id', profile.team_id)
+        .then(({ data }) => { setReports(data ?? []); setReportsLoading(false) })
+    } else if (!isCoachView) {
+      supabase.rpc('get_my_reports')
+        .then(({ data }) => { setReports(data ?? []); setReportsLoading(false) })
+    } else {
+      setReports([])
+      setReportsLoading(false)
+    }
   }, [profile, profileState])
 
   async function handleSignOut() {
@@ -383,20 +410,28 @@ export default function ParticipantDashboardPage() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <img src="/logo.png" alt="Gallup Strengths" className="h-10 w-auto" />
-          <button onClick={handleSignOut} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-            Sign out
-          </button>
+          {isCoachView ? (
+            <button onClick={() => navigate(-1)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">← Back</button>
+          ) : (
+            <button onClick={handleSignOut} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Sign out</button>
+          )}
         </div>
       </header>
+
+      {isCoachView && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-xs text-amber-700 font-medium">
+          Coach view — {profile.name}'s dashboard
+        </div>
+      )}
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 py-10 space-y-10">
 
         {/* Welcome + Top 5 */}
         <section>
           <div className="flex items-start justify-between mb-1">
-            <h1 className="text-2xl font-bold text-gray-900">Hi {firstName}!</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{isCoachView ? profile.name : `Hi ${firstName}!`}</h1>
           </div>
-          <p className="text-gray-500 text-sm mb-5">Your CliftonStrengths dashboard.</p>
+          <p className="text-gray-500 text-sm mb-5">{isCoachView ? profile.email : 'Your CliftonStrengths dashboard.'}</p>
 
           {hasStrengths ? (
             <div className="flex flex-wrap gap-2 items-center">
@@ -413,17 +448,19 @@ export default function ParticipantDashboardPage() {
                   </div>
                 )
               })}
-              <button
-                onClick={() => setShowEditTop5(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 border border-dashed border-gray-300 hover:border-brand-400 hover:text-brand-600 transition-colors"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-                Edit
-              </button>
+              {!isCoachView && (
+                <button
+                  onClick={() => setShowEditTop5(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 border border-dashed border-gray-300 hover:border-brand-400 hover:text-brand-600 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  Edit
+                </button>
+              )}
             </div>
-          ) : (
+          ) : !isCoachView ? (
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800 flex items-start justify-between gap-4">
               <p>Your Top 5 strengths haven't been entered yet. Your coach will add them before your session.</p>
               <button
@@ -433,6 +470,8 @@ export default function ParticipantDashboardPage() {
                 Add mine
               </button>
             </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">No strengths on file.</p>
           )}
         </section>
 

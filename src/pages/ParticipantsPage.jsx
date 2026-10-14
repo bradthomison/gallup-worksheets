@@ -1795,7 +1795,7 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
                         <div className="grid gap-1.5" style={{ gridTemplateColumns: 'auto auto' }}>
                           {p.email ? (
                             <a
-                              href={`/me?hint=${encodeURIComponent(p.email)}`}
+                              href={`/me?as=${encodeURIComponent(p.email)}`}
                               target="_blank"
                               rel="noreferrer"
                               className="w-full text-center text-xs font-medium text-emerald-600 hover:text-emerald-800 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-3 py-1 rounded-lg transition-colors"
