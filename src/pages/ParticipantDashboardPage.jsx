@@ -329,7 +329,7 @@ export default function ParticipantDashboardPage() {
     </div>
     <script>window.addEventListener('load',function(){window.print()})</script>
     </body></html>`
-    const win = window.open('', '_blank', 'noopener')
+    const win = window.open('', '_blank')
     win.document.open(); win.document.write(html); win.document.close()
   }
 

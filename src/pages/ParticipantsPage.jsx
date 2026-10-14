@@ -1364,7 +1364,7 @@ export default function ParticipantsPage() {
     </div>
     <script>window.addEventListener('load',function(){window.print()})</script>
     </body></html>`
-    const win = window.open('', '_blank', 'noopener')
+    const win = window.open('', '_blank')
     win.document.open(); win.document.write(html); win.document.close()
   }
 
@@ -1844,7 +1844,7 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
                             className="w-full text-xs font-medium text-gray-600 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!(p.top5 ?? []).some(Boolean) ? 'No strengths on file' : 'Print name tent'}
                           >
-                            Print Name Tent
+                            Name Tent
                           </button>
                           <button
                             onClick={() => { setExpandedPersonId(id => id === p.id ? null : p.id); setReportsPersonId(null); setEditingId(null) }}
