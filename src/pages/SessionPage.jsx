@@ -102,6 +102,8 @@ export default function SessionPage() {
   const [selectedRecipients, setSelectedRecipients] = useState(new Set())
   const [sendingLinkId, setSendingLinkId] = useState(null)
   const [sentLinkId, setSentLinkId] = useState(null)
+  const [nameTentsModal, setNameTentsModal] = useState(false)
+  const [nameTentsSelected, setNameTentsSelected] = useState(new Set())
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -432,6 +434,101 @@ export default function SessionPage() {
     setConfirmArchive(false)
   }
 
+  function openNameTents() {
+    setNameTentsSelected(new Set(participants.map(p => p.id)))
+    setNameTentsModal(true)
+  }
+
+  function toggleNameTent(id) {
+    setNameTentsSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function doPrintNameTents() {
+    const selected = participants.filter(p => nameTentsSelected.has(p.id))
+    if (!selected.length) return
+
+    const domainColor = {
+      Analytical: '#16a34a', Context: '#16a34a', Futuristic: '#16a34a', Ideation: '#16a34a',
+      Input: '#16a34a', Intellection: '#16a34a', Learner: '#16a34a', Strategic: '#16a34a',
+      Activator: '#ea580c', Command: '#ea580c', Communication: '#ea580c', Competition: '#ea580c',
+      Maximizer: '#ea580c', 'Self-Assurance': '#ea580c', Significance: '#ea580c', Woo: '#ea580c',
+      Adaptability: '#2563eb', Connectedness: '#2563eb', Developer: '#2563eb', Empathy: '#2563eb',
+      Harmony: '#2563eb', Includer: '#2563eb', Individualization: '#2563eb', Positivity: '#2563eb', Relator: '#2563eb',
+      Achiever: '#7c3aed', Arranger: '#7c3aed', Belief: '#7c3aed', Consistency: '#7c3aed',
+      Deliberative: '#7c3aed', Discipline: '#7c3aed', Focus: '#7c3aed', Responsibility: '#7c3aed', Restorative: '#7c3aed',
+    }
+
+    function esc(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    }
+
+    const pages = selected.map(person => {
+      const strengths = (person.top5 ?? []).filter(Boolean)
+      const strengthRows = strengths.map(s =>
+        `<div style="font-size:19pt;font-weight:800;color:${domainColor[s] || '#374151'};margin:3px 0;letter-spacing:-0.01em;">${esc(s)}</div>`
+      ).join('')
+
+      return `
+        <div class="page">
+          <div class="fold-row">
+            <div class="tick" style="left:33.333%"></div>
+            <div class="tick" style="left:66.666%"></div>
+          </div>
+          <div class="panels">
+            <div class="panel" style="transform:rotate(180deg);">
+              <div class="strength-list">${strengthRows}</div>
+            </div>
+            <div class="panel name-panel" style="transform:rotate(180deg);">
+              <div class="name">${esc(person.name)}</div>
+            </div>
+            <div class="panel front-panel">
+              <div class="strength-list">${strengthRows}</div>
+              <div class="name" style="margin-top:18px;">${esc(person.name)}</div>
+            </div>
+          </div>
+          <div class="fold-row">
+            <div class="tick" style="left:33.333%"></div>
+            <div class="tick" style="left:66.666%"></div>
+          </div>
+        </div>`
+    }).join('')
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: landscape; margin: 0; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background: white; }
+  .page { width: 100vw; height: 100vh; display: flex; flex-direction: column; page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+  .fold-row { height: 12px; position: relative; flex-shrink: 0; }
+  .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: #555; transform: translateX(-50%); }
+  .panels { flex: 1; display: flex; }
+  .panel { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; }
+  .name-panel { border-left: 1px solid #d1d5db; border-right: 1px solid #d1d5db; }
+  .strength-list { display: flex; flex-direction: column; align-items: center; }
+  .name { font-size: 46pt; font-weight: 900; color: #111827; text-align: center; line-height: 1.05; letter-spacing: -0.03em; }
+  @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+</style>
+</head>
+<body>
+${pages}
+<script>window.addEventListener('load', function() { window.print(); });</script>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'noopener')
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+  }
+
   if (loading) return <Layout><p className="text-gray-500 text-sm">Loading…</p></Layout>
   if (!session) return <Layout><p className="text-red-500 text-sm">Session not found.</p></Layout>
 
@@ -504,6 +601,67 @@ export default function SessionPage() {
                   disabled={selectedRecipients.size === 0 || sendingLinks}
                   className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
                 >{sendingLinks ? 'Sending…' : 'Send'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Name Tents modal */}
+      {nameTentsModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-900">Print Table Name Tents</h2>
+              <button onClick={() => setNameTentsModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+
+            {/* Select all / Deselect all */}
+            <div className="px-6 py-2 border-b border-gray-100 bg-gray-50 flex gap-3">
+              <button
+                onClick={() => setNameTentsSelected(new Set(participants.map(p => p.id)))}
+                className="text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors"
+              >Select all</button>
+              <span className="text-gray-300">|</span>
+              <button
+                onClick={() => setNameTentsSelected(new Set())}
+                className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              >Deselect all</button>
+            </div>
+
+            {/* Participant list */}
+            <div className="overflow-y-auto flex-1 divide-y divide-gray-100 px-2 py-1">
+              {participants.map(p => (
+                <label key={p.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    checked={nameTentsSelected.has(p.id)}
+                    onChange={() => toggleNameTent(p.id)}
+                    className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                    <p className="text-xs text-gray-400">{(p.top5 ?? []).join(', ') || 'No strengths'}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl">
+              <span className="text-sm text-gray-500">
+                <span className="font-semibold text-gray-900">{nameTentsSelected.size}</span> selected
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setNameTentsModal(false)}
+                  className="text-sm text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors"
+                >Cancel</button>
+                <button
+                  onClick={doPrintNameTents}
+                  disabled={nameTentsSelected.size === 0}
+                  className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                >Print</button>
               </div>
             </div>
           </div>
@@ -685,6 +843,13 @@ export default function SessionPage() {
                 title="Download blank print-ready worksheets"
               >↓ Blank PDFs</button>
             )}
+            {/* Name Tents */}
+            <button
+              onClick={openNameTents}
+              disabled={participants.length === 0}
+              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              title="Print folded table name tents for each participant"
+            >⬛ Print Name Tents</button>
           </div>
 
           {/* Edit + Archive + Delete */}
