@@ -565,6 +565,32 @@ function PersonReportsPanel({ person, reports, onClose, onOpenPersonalInsights, 
               </div>
             )
           })}
+          {/* Team Reports */}
+          {person.team_id && (
+            <>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 pb-1">Team Reports</p>
+              {[
+                { key: 'grid', label: 'Team Strengths Grid', path: `/team-grid?teamId=${person.team_id}` },
+                { key: 'spark', label: 'Theme Spark', path: `/team-spark?teamId=${person.team_id}` },
+              ].map(({ key, path, label }) => {
+                const url = `${window.location.origin}${path}`
+                return (
+                  <div key={key} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Team</span>
+                      <span className="text-sm text-gray-700 truncate">{label}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0 ml-3 divide-x divide-gray-200">
+                      <button onClick={() => window.open(url, '_blank', 'noopener')} className={actionBtnBrand}>Open</button>
+                      <button onClick={() => copyLink(key, url)} className={`pl-2.5 ${actionBtn}`}>
+                        {copied[key] ? '✓ Copied' : 'Copy Link'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </>
+          )}
         </div>
       )}
     </div>
