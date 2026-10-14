@@ -226,6 +226,16 @@ export default function TeamPortalPage() {
       })
     }
 
+    if (hasStrengths(person)) {
+      cards.push({
+        id: 'talent-map',
+        name: 'Talent Map',
+        description: 'Discover how your Top 5 strengths help you build relationships, communicate, lead change, and more.',
+        icon: <IconPeople />,
+        href: `/talent-map?email=${email}`,
+      })
+    }
+
     reports.forEach(r => {
       cards.push({
         id: r.id,

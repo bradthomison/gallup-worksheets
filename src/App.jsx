@@ -18,6 +18,7 @@ import ReportLMSPage from './pages/ReportLMSPage'
 import TeamPortalPage from './pages/TeamPortalPage'
 import PowerOf2LMSPage from './pages/PowerOf2LMSPage'
 import PowerOfMeLMSPage from './pages/PowerOfMeLMSPage'
+import TalentMapPage from './pages/TalentMapPage'
 import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
 
@@ -41,6 +42,7 @@ export default function App() {
       <Route path="/team/:teamId" element={<TeamPortalPage />} />
       <Route path="/power-of-2/:variant?" element={<PowerOf2LMSPage />} />
       <Route path="/power-of-me" element={<PowerOfMeLMSPage />} />
+      <Route path="/talent-map" element={<TalentMapPage />} />
       <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
