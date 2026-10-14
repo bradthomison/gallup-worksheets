@@ -7,6 +7,18 @@ export const TEAM_SENTINEL = '__team_overview__'
 export const POM_SENTINEL = '__power_of_me__'
 export const P2_PREFIX = '__power_of_2__:'
 
+// Returns true when a session's prompts array is a built-in report (sentinel), not editable prompts.
+export function isReportPrompts(prompts) {
+  if (!Array.isArray(prompts) || prompts.length === 0) return false
+  const first = prompts[0]
+  return (
+    first === PI_SENTINEL ||
+    first === TEAM_SENTINEL ||
+    first === POM_SENTINEL ||
+    first?.startsWith(P2_PREFIX)
+  )
+}
+
 // Info for a sentinel prompt, or null when the prompt is an ordinary prompt / custom report id.
 export function sessionReportInfo(prompt) {
   if (prompt === PI_SENTINEL) return { kind: 'pi', name: 'Personal Insights' }

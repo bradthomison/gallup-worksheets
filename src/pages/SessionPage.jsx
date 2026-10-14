@@ -9,7 +9,7 @@ import { parseParticipants } from '../lib/parseParticipants'
 import { downloadSessionPDFs, downloadBlankSessionPDFs, downloadBlankWorksheetPDF } from '../lib/downloadWorksheetPDF'
 import { formatDateLong } from '../lib/dateUtils'
 import { printNameTents } from '../lib/printNameTent'
-import { sessionReportInfo } from '../lib/sessionReports'
+import { sessionReportInfo, isReportPrompts } from '../lib/sessionReports'
 import PromptInputs, { padPrompts } from '../components/PromptInputs'
 
 // ── Group Access Link card with QR code ───────────────────────────────────────
@@ -105,6 +105,12 @@ export default function SessionPage() {
   const [sentLinkId, setSentLinkId] = useState(null)
   const [nameTentsModal, setNameTentsModal] = useState(false)
   const [nameTentsSelected, setNameTentsSelected] = useState(new Set())
+  const [manageModal, setManageModal] = useState(false)
+  const [managePendingRemove, setManagePendingRemove] = useState(new Set())
+  const [manageAddSelected, setManageAddSelected] = useState(new Set())
+  const [manageSearch, setManageSearch] = useState('')
+  const [managePeople, setManagePeople] = useState([])
+  const [manageSaving, setManageSaving] = useState(false)
 
   // Edit mode
   const [editing, setEditing] = useState(false)
@@ -435,6 +441,47 @@ export default function SessionPage() {
     setConfirmArchive(false)
   }
 
+  async function openManageModal() {
+    const { data } = await supabase.from('people').select('*').order('name')
+    setManagePeople(data ?? [])
+    setManagePendingRemove(new Set())
+    setManageAddSelected(new Set())
+    setManageSearch('')
+    setManageModal(true)
+  }
+
+  async function saveManageModal() {
+    setManageSaving(true)
+    if (managePendingRemove.size > 0) {
+      await supabase.from('participants').delete().in('id', [...managePendingRemove])
+    }
+    const toAdd = managePeople.filter(p => manageAddSelected.has(p.id))
+    if (toAdd.length > 0) {
+      await supabase.from('participants').insert(
+        toAdd.map(p => ({
+          session_id: id,
+          name: p.name,
+          email: p.email,
+          top5: p.top5,
+          is_manager: false,
+          worksheet_url_slug: crypto.randomUUID(),
+        }))
+      )
+    }
+    setManageSaving(false)
+    setManageModal(false)
+    load()
+  }
+
+  const manageExistingEmails = new Set(
+    participants.filter(p => !managePendingRemove.has(p.id)).map(p => p.email)
+  )
+  const manageFilteredPeople = managePeople.filter(p => {
+    if (manageExistingEmails.has(p.email)) return false
+    const q = manageSearch.toLowerCase()
+    return !q || p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
+  })
+
   function openNameTents() {
     setNameTentsSelected(new Set(participants.map(p => p.id)))
     setNameTentsModal(true)
@@ -587,6 +634,106 @@ export default function SessionPage() {
                   disabled={nameTentsSelected.size === 0}
                   className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
                 >Print</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Participants modal */}
+      {manageModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh]">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-base font-bold text-gray-900">Manage Participants</h2>
+              <button onClick={() => setManageModal(false)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+            </div>
+
+            {/* Current participants */}
+            <div className="px-6 pt-3 pb-1">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Current Participants</p>
+            </div>
+            <div className="overflow-y-auto max-h-48 divide-y divide-gray-100 px-2">
+              {participants.map(p => {
+                const removing = managePendingRemove.has(p.id)
+                return (
+                  <div key={p.id} className={`flex items-center justify-between px-4 py-2 ${removing ? 'bg-red-50 opacity-60' : ''}`}>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.email}</p>
+                    </div>
+                    <button
+                      onClick={() => setManagePendingRemove(prev => {
+                        const next = new Set(prev)
+                        removing ? next.delete(p.id) : next.add(p.id)
+                        return next
+                      })}
+                      className={`text-xs font-medium px-2 py-1 rounded transition-colors ${removing ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'}`}
+                    >{removing ? 'Undo' : 'Remove'}</button>
+                  </div>
+                )
+              })}
+              {participants.length === 0 && (
+                <p className="px-4 py-3 text-sm text-gray-400 italic">No participants yet</p>
+              )}
+            </div>
+
+            {/* Add people */}
+            <div className="px-6 pt-3 pb-1 border-t border-gray-100 mt-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add People</p>
+              <input
+                type="text"
+                placeholder="Search by name or email…"
+                value={manageSearch}
+                onChange={e => setManageSearch(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400"
+              />
+            </div>
+            <div className="overflow-y-auto flex-1 divide-y divide-gray-100 px-2 pb-1">
+              {manageFilteredPeople.map(p => {
+                const selected = manageAddSelected.has(p.id)
+                return (
+                  <label key={p.id} className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => setManageAddSelected(prev => {
+                        const next = new Set(prev)
+                        selected ? next.delete(p.id) : next.add(p.id)
+                        return next
+                      })}
+                      className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                      <p className="text-xs text-gray-400">{p.email}</p>
+                    </div>
+                  </label>
+                )
+              })}
+              {manageFilteredPeople.length === 0 && (
+                <p className="px-4 py-3 text-sm text-gray-400 italic">No people to add{manageSearch ? ' matching that search' : ''}</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3 bg-gray-50 rounded-b-2xl">
+              <span className="text-sm text-gray-500">
+                {managePendingRemove.size > 0 && <span className="text-red-600 font-medium">{managePendingRemove.size} removing</span>}
+                {managePendingRemove.size > 0 && manageAddSelected.size > 0 && <span className="mx-1 text-gray-300">·</span>}
+                {manageAddSelected.size > 0 && <span className="text-green-600 font-medium">{manageAddSelected.size} adding</span>}
+                {managePendingRemove.size === 0 && manageAddSelected.size === 0 && <span>No changes</span>}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setManageModal(false)}
+                  className="text-sm text-gray-500 hover:text-gray-800 font-medium px-4 py-2 rounded-lg transition-colors"
+                >Cancel</button>
+                <button
+                  onClick={saveManageModal}
+                  disabled={manageSaving || (managePendingRemove.size === 0 && manageAddSelected.size === 0)}
+                  className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+                >{manageSaving ? 'Saving…' : 'Save'}</button>
               </div>
             </div>
           </div>
@@ -768,6 +915,12 @@ export default function SessionPage() {
                 title="Download blank print-ready worksheets"
               >↓ Blank PDFs</button>
             )}
+            {/* Manage Participants */}
+            <button
+              onClick={openManageModal}
+              className="px-3 py-1.5 text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
+              title="Add or remove participants"
+            >Manage Participants</button>
             {/* Name Tents */}
             <button
               onClick={openNameTents}
