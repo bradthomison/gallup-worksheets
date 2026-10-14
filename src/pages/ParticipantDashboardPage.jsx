@@ -411,7 +411,7 @@ export default function ParticipantDashboardPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <img src="/logo.png" alt="Gallup Strengths" className="h-10 w-auto" />
           {isCoachView ? (
-            <button onClick={() => navigate(-1)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">← Back</button>
+            <button onClick={() => window.close()} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">✕ Close</button>
           ) : (
             <button onClick={handleSignOut} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Sign out</button>
           )}
