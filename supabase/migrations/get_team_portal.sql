@@ -12,7 +12,7 @@ declare
   v_members   json;
   v_reports   json;
 begin
-  select id, name into v_team
+  select id, name, manager_id, created_by into v_team
   from teams
   where id = p_team_id;
 
@@ -31,7 +31,7 @@ begin
   where r.created_by = (select created_by from teams where id = p_team_id);
 
   return json_build_object(
-    'team',    json_build_object('id', v_team.id, 'name', v_team.name),
+    'team',    json_build_object('id', v_team.id, 'name', v_team.name, 'manager_id', v_team.manager_id, 'created_by', v_team.created_by),
     'members', coalesce(v_members, '[]'::json),
     'reports', coalesce(v_reports, '[]'::json)
   );

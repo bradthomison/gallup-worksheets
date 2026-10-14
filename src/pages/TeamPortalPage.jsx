@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
 import { PERSONAL_INSIGHTS } from '../data/personalInsights'
 import { BRING_NEED } from '../data/bringNeed'
 import { P2_VARIANTS, P2_VARIANT_ORDER, p2Path } from '../data/powerOf2'
@@ -126,9 +127,11 @@ export default function TeamPortalPage() {
   const [searchParams] = useSearchParams()
   const memberParam = searchParams.get('member')
   const emailParam = searchParams.get('email')
+  const { user, loading: authLoading } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [team, setTeam] = useState(null)
   const [members, setMembers] = useState([])
   const [reports, setReports] = useState([])
@@ -139,26 +142,45 @@ export default function TeamPortalPage() {
   const [worksheetsLoading, setWorksheetsLoading] = useState(false)
 
   useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      navigate(`/sign-in?next=/team/${teamId}`, { replace: true })
+      return
+    }
     async function load() {
       const { data, error } = await supabase.rpc('get_team_portal', { p_team_id: teamId })
       if (error || data?.error === 'not_found') {
         setNotFound(true)
-      } else {
-        setTeam(data.team)
-        const loadedMembers = data.members ?? []
-        setMembers(loadedMembers)
-        setReports(data.reports ?? [])
-        const pre = memberParam
-          ? loadedMembers.find(m => m.id === memberParam)
-          : emailParam
-            ? loadedMembers.find(m => m.email?.toLowerCase() === emailParam.toLowerCase())
-            : null
-        if (pre) setSelected(pre)
+        setLoading(false)
+        return
       }
+      const teamData = data.team
+      // Check access: coach (created this team) or designated team manager
+      const isCoach = teamData.created_by === user.id
+      let isManager = false
+      if (!isCoach) {
+        const { data: profile } = await supabase.rpc('get_my_participant_profile')
+        isManager = profile?.id === teamData.manager_id
+      }
+      if (!isCoach && !isManager) {
+        setAccessDenied(true)
+        setLoading(false)
+        return
+      }
+      setTeam(teamData)
+      const loadedMembers = data.members ?? []
+      setMembers(loadedMembers)
+      setReports(data.reports ?? [])
+      const pre = memberParam
+        ? loadedMembers.find(m => m.id === memberParam)
+        : emailParam
+          ? loadedMembers.find(m => m.email?.toLowerCase() === emailParam.toLowerCase())
+          : null
+      if (pre) setSelected(pre)
       setLoading(false)
     }
     load()
-  }, [teamId])
+  }, [teamId, user, authLoading])
 
   // Load worksheets when a member is selected
   useEffect(() => {
@@ -190,7 +212,7 @@ export default function TeamPortalPage() {
         cards.push({
           id: 'personal-insights',
           name: 'Personal Insights',
-          description: 'Explore your unique strengths and how they show up in your work.',
+          description: 'Explore how this team member\'s unique strengths show up in their work.',
           icon: <IconBadge />,
           href: `/personal-insights?email=${email}`,
         })
@@ -200,7 +222,7 @@ export default function TeamPortalPage() {
         cards.push({
           id: 'bring-need',
           name: 'Bring – Need',
-          description: 'See what you bring to a team and what energizes you.',
+          description: 'See what this team member brings to the team and what energizes them.',
           icon: <IconPeople />,
           href: `/bring-need?email=${email}`,
         })
@@ -211,7 +233,7 @@ export default function TeamPortalPage() {
     cards.push({
       id: 'power-of-2',
       name: 'The Power of 2',
-      description: 'Pair with a teammate to explore how your strengths interact.',
+      description: 'Explore how this team member\'s strengths interact with another person\'s.',
       icon: <IconPeople />,
       action: 'p2modal',
     })
@@ -220,7 +242,7 @@ export default function TeamPortalPage() {
       cards.push({
         id: 'power-of-me',
         name: 'The Power of Me',
-        description: 'Explore how the roles and descriptive words of your own Top 5 strengths interact.',
+        description: 'Explore how the roles and descriptive words of their Top 5 strengths interact.',
         icon: <IconPeople />,
         href: `/power-of-me?email=${email}`,
       })
@@ -230,7 +252,7 @@ export default function TeamPortalPage() {
       cards.push({
         id: 'talent-map',
         name: 'Talent Map',
-        description: 'Discover how your Top 5 strengths help you build relationships, communicate, lead change, and more.',
+        description: 'Discover how their Top 5 strengths help them build relationships, communicate, lead change, and more.',
         icon: <IconPeople />,
         href: `/talent-map?email=${email}`,
       })
@@ -240,7 +262,7 @@ export default function TeamPortalPage() {
       cards.push({
         id: r.id,
         name: r.name,
-        description: 'A custom report created by your coach.',
+        description: 'A custom report for this team.',
         icon: <IconChart />,
         href: `/report/${r.id}?email=${email}`,
       })
@@ -271,7 +293,7 @@ export default function TeamPortalPage() {
     )
   }
 
-  if (notFound) {
+  if (notFound || accessDenied) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <header className="bg-white border-b border-gray-200">
@@ -281,8 +303,12 @@ export default function TeamPortalPage() {
         </header>
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <p className="text-gray-700 font-medium mb-2">Team not found.</p>
-            <p className="text-sm text-gray-500">This link may be invalid or the team may have been deleted.</p>
+            <p className="text-gray-700 font-medium mb-2">{accessDenied ? 'Access denied.' : 'Team not found.'}</p>
+            <p className="text-sm text-gray-500">
+              {accessDenied
+                ? 'This page is only available to coaches and the team manager.'
+                : 'This link may be invalid or the team may have been deleted.'}
+            </p>
           </div>
         </main>
         <SiteFooter />
@@ -319,7 +345,7 @@ export default function TeamPortalPage() {
             {members.some(m => (m.top5 ?? []).some(Boolean)) && (
               <div className="mb-10">
                 <h2 className="text-lg font-bold text-gray-900 mb-1">Team Reports</h2>
-                <p className="text-sm text-gray-500 mb-4">Reports for the whole team.</p>
+                <p className="text-sm text-gray-500 mb-4">Strengths-based reports for your entire team.</p>
                 <div className="grid grid-cols-1 gap-4">
                   <a
                     href={`/team-summary?teamId=${teamId}`}
@@ -332,7 +358,7 @@ export default function TeamPortalPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900">Team Summary</p>
-                      <p className="text-sm text-gray-500 mt-0.5">Top 5 themes, domain breakdown, and what your team brings, needs, and is motivated by.</p>
+                      <p className="text-sm text-gray-500 mt-0.5">Top 5 themes, domain breakdown, and what the team brings, needs, and is motivated by.</p>
                     </div>
                     <svg className="w-5 h-5 text-gray-400 group-hover:text-brand-500 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -379,12 +405,12 @@ export default function TeamPortalPage() {
             {/* Team members — with search always visible */}
             <div>
               <h2 className="text-lg font-bold text-gray-900 mb-1">Team Members</h2>
-              <p className="text-gray-500 text-sm mb-4">Select your name to view your available reports.</p>
+              <p className="text-gray-500 text-sm mb-4">Select a team member to view their available reports and worksheets.</p>
 
               {members.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                   <p className="text-gray-500 text-sm">No members have been added to this team yet.</p>
-                  <p className="text-xs text-gray-400 mt-1">Contact your coach to get set up.</p>
+                  <p className="text-xs text-gray-400 mt-1">Add members from the Participants page.</p>
                 </div>
               ) : (
                 <>
@@ -393,7 +419,7 @@ export default function TeamPortalPage() {
                       type="search"
                       value={search}
                       onChange={e => setSearch(e.target.value)}
-                      placeholder="Search your name…"
+                      placeholder="Search by name…"
                       className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
@@ -431,15 +457,15 @@ export default function TeamPortalPage() {
                 Back to team
               </button>
               <p className="text-xs font-semibold text-brand-500 uppercase tracking-widest mb-1">{team.name}</p>
-              <h1 className="text-3xl font-bold text-gray-900">Hi, {selected.name.split(' ')[0]}!</h1>
-              <p className="text-gray-500 text-sm mt-2">Select a report to view.</p>
+              <h1 className="text-3xl font-bold text-gray-900">{selected.name}</h1>
+              <p className="text-gray-500 text-sm mt-2">Reports and worksheets for this team member.</p>
             </div>
 
             {/* Reports section */}
             {cards.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
-                <p className="text-gray-500 text-sm">No reports are available for you yet.</p>
-                <p className="text-xs text-gray-400 mt-1">Contact your coach to get set up.</p>
+                <p className="text-gray-500 text-sm">No reports available for this team member.</p>
+                <p className="text-xs text-gray-400 mt-1">Strengths data may not be on file yet.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 mb-10">
@@ -466,8 +492,8 @@ export default function TeamPortalPage() {
 
             {/* Worksheets section */}
             <div>
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Your Worksheets</h2>
-              <p className="text-sm text-gray-500 mb-4">Worksheets assigned to you by your coach.</p>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Session Worksheets</h2>
+              <p className="text-sm text-gray-500 mb-4">Worksheets from sessions this team member has participated in.</p>
 
               {worksheetsLoading ? (
                 <p className="text-sm text-gray-400">Loading worksheets…</p>

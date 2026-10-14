@@ -26,12 +26,13 @@ begin
   end if;
 
   select json_build_object(
-    'name',     p.name,
-    'email',    lower(p.email),
-    'top5',     p.top5,
-    'team_id',  p.team_id,
-    'approved', p.approved,
-    'id',       p.id
+    'name',             p.name,
+    'email',            lower(p.email),
+    'top5',             p.top5,
+    'team_id',          p.team_id,
+    'approved',         p.approved,
+    'id',               p.id,
+    'is_team_manager',  exists(select 1 from teams t where t.manager_id = p.id and t.id = p.team_id)
   )
   into v_result
   from people p

@@ -606,6 +606,31 @@ export default function ParticipantDashboardPage() {
           </section>
         )}
 
+        {/* Team Portal — managers only */}
+        {profile.is_team_manager && profile.team_id && (
+          <section>
+            <h2 className="text-base font-bold text-gray-900 mb-1">Team Portal</h2>
+            <p className="text-sm text-gray-500 mb-4">As the team manager, you can view reports and worksheets for each team member.</p>
+            <Link
+              to={`/team/${profile.team_id}`}
+              className="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-5 py-4 hover:border-brand-300 hover:shadow-sm transition-all group"
+            >
+              <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 shrink-0 group-hover:bg-brand-100 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">Open Team Portal</p>
+                <p className="text-xs text-gray-500 mt-0.5">View your team's strengths, reports, and session worksheets</p>
+              </div>
+              <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-500 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </section>
+        )}
+
         {/* Print name tent */}
         {hasStrengths && (
           <section>
