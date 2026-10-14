@@ -559,7 +559,19 @@ export default function ParticipantDashboardPage() {
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-1">Team Reports</h2>
             <p className="text-sm text-gray-500 mb-4">See how your whole team's strengths fit together.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Link
+                to={`/team-summary?teamId=${profile.team_id}`}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-brand-300 hover:shadow-sm transition-all group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 mb-3 group-hover:bg-brand-100 transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p className="font-semibold text-gray-900 text-sm mb-1">Team Summary</p>
+                <p className="text-xs text-gray-500 leading-relaxed">Top 5 themes, domain breakdown, and what your team brings and needs</p>
+              </Link>
               <Link
                 to={`/team-grid?teamId=${profile.team_id}`}
                 className="bg-white border border-gray-200 rounded-xl p-5 hover:border-brand-300 hover:shadow-sm transition-all group"

@@ -322,6 +322,23 @@ export default function TeamPortalPage() {
                 <p className="text-sm text-gray-500 mb-4">Reports for the whole team.</p>
                 <div className="grid grid-cols-1 gap-4">
                   <a
+                    href={`/team-summary?teamId=${teamId}`}
+                    className="flex items-center gap-5 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-2xl px-6 py-5 text-left transition-colors group"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center shrink-0 group-hover:bg-brand-200 transition-colors">
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900">Team Summary</p>
+                      <p className="text-sm text-gray-500 mt-0.5">Top 5 themes, domain breakdown, and what your team brings, needs, and is motivated by.</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-400 group-hover:text-brand-500 shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                  <a
                     href={`/team-grid?teamId=${teamId}`}
                     className="flex items-center gap-5 bg-white hover:bg-brand-50 border border-gray-200 hover:border-brand-300 rounded-2xl px-6 py-5 text-left transition-colors group"
                   >

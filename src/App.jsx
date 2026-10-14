@@ -25,6 +25,7 @@ import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
 import TeamGridPage from './pages/TeamGridPage'
 import TeamSparkPage from './pages/TeamSparkPage'
+import TeamSummaryPage from './pages/TeamSummaryPage'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -53,6 +54,7 @@ export default function App() {
       <Route path="/me" element={<ParticipantDashboardPage />} />
       <Route path="/team-grid" element={<TeamGridPage />} />
       <Route path="/team-spark" element={<TeamSparkPage />} />
+      <Route path="/team-summary" element={<TeamSummaryPage />} />
       <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
