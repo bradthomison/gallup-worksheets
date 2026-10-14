@@ -2,20 +2,21 @@ import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
-import { getStrengthColors } from '../lib/strengthColors'
-import { p2Path } from '../data/powerOf2'
+import { getStrengthColors, STRENGTH_DOMAIN } from '../lib/strengthColors'
 import SiteFooter from '../components/SiteFooter'
 
-// ── Worksheet card definitions ────────────────────────────────────────────────
+const ALL_STRENGTHS = Object.keys(STRENGTH_DOMAIN).sort()
 
-function worksheetCards(email, teamId) {
+// ── Evergreen worksheet cards ─────────────────────────────────────────────────
+
+function evergreenCards(email, teamId) {
   const e = encodeURIComponent(email)
   const t = teamId ? `&teamId=${teamId}` : ''
   return [
     {
       id: 'talent-map',
       name: 'Talent Map',
-      description: 'Explore how each of your strengths helps you build relationships, communicate, lead change, and more.',
+      description: 'Explore how your strengths help you build relationships, communicate, lead change, and more.',
       href: `/talent-map?email=${e}`,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,55 +63,237 @@ function StatusPill({ submittedAt, responseCount }) {
   )
 }
 
+// ── Edit Top 5 modal ──────────────────────────────────────────────────────────
+
+function EditTop5Modal({ currentTop5, onSave, onClose }) {
+  const [top5, setTop5] = useState(() => {
+    const base = currentTop5?.slice(0, 5) ?? []
+    while (base.length < 5) base.push('')
+    return base
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  function setStrength(idx, val) {
+    setTop5(prev => prev.map((s, i) => i === idx ? val : s))
+  }
+
+  async function handleSave() {
+    const filled = top5.filter(Boolean)
+    if (filled.length === 0) { setError('Enter at least one strength.'); return }
+    setSaving(true)
+    setError(null)
+    const { error: err } = await supabase.rpc('update_my_top5', { p_top5: top5 })
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    onSave(top5)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl space-y-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">Edit My Top 5</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <p className="text-sm text-gray-500">If your coach entered a strength incorrectly, update it here. Changes take effect immediately.</p>
+        <div className="space-y-3">
+          {top5.map((s, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-xs font-bold text-gray-400 w-4 text-right">{i + 1}</span>
+              <select
+                value={s}
+                onChange={e => setStrength(i, e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                <option value="">— Select strength —</option>
+                {ALL_STRENGTHS.filter(str => !top5.includes(str) || str === s).map(str => (
+                  <option key={str} value={str}>{str}</option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-lg border border-gray-300 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded-lg bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold py-2.5 text-sm transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Request Access form ───────────────────────────────────────────────────────
+
+function RequestAccessForm({ userEmail, onSubmitted }) {
+  const [name, setName] = useState('')
+  const [top5, setTop5] = useState(['', '', '', '', ''])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  function setStrength(idx, val) {
+    setTop5(prev => prev.map((s, i) => i === idx ? val : s))
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!name.trim()) { setError('Your name is required.'); return }
+    const filled = top5.filter(Boolean)
+    if (filled.length === 0) { setError('Enter at least one strength.'); return }
+    setSubmitting(true)
+    setError(null)
+    const { data, error: err } = await supabase.rpc('request_access', {
+      p_name: name.trim(),
+      p_top5: top5,
+    })
+    setSubmitting(false)
+    if (err) { setError(err.message); return }
+    onSubmitted()
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <img src="/logo.png" alt="Gallup Strengths" className="h-16 w-auto mx-auto mb-4" />
+        </div>
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Request Access</h2>
+            <p className="text-sm text-gray-500">
+              We don't have a profile for <span className="font-medium">{userEmail}</span> yet.
+              Fill in your details and a coach will approve your access.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Your name</label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="First and last name"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Your Top 5 CliftonStrengths</label>
+            <p className="text-xs text-gray-400 mb-3">Enter what you know — you can leave blanks if you're unsure.</p>
+            <div className="space-y-2.5">
+              {top5.map((s, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-400 w-4 text-right">{i + 1}</span>
+                  <select
+                    value={s}
+                    onChange={e => setStrength(i, e.target.value)}
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="">— Select strength —</option>
+                    {ALL_STRENGTHS.filter(str => !top5.includes(str) || str === s).map(str => (
+                      <option key={str} value={str}>{str}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-brand-500 hover:bg-brand-600 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition-colors"
+          >
+            {submitting ? 'Submitting…' : 'Request Access'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ParticipantDashboardPage() {
   const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [profile, setProfile] = useState(null)
-  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileState, setProfileState] = useState('loading') // 'loading' | 'found' | 'not_found' | 'pending' | 'error'
   const [worksheets, setWorksheets] = useState([])
   const [worksheetsLoading, setWorksheetsLoading] = useState(false)
+  const [reports, setReports] = useState([])
+  const [reportsLoading, setReportsLoading] = useState(false)
+  const [showEditTop5, setShowEditTop5] = useState(false)
+  const [requestSubmitted, setRequestSubmitted] = useState(false)
 
-  // Guard: not signed in
   useEffect(() => {
     if (!authLoading && !user) navigate('/sign-in', { replace: true })
   }, [user, authLoading])
 
-  // Load participant profile + link account on first sign-in
   useEffect(() => {
     if (!user) return
     async function load() {
-      setProfileLoading(true)
-      // Link any unlinked participant rows for this email (no-op if already done)
+      setProfileState('loading')
       await supabase.rpc('link_participant_account')
-      // Load profile
       const { data } = await supabase.rpc('get_my_participant_profile')
-      setProfileLoading(false)
-      if (!data || data.error) return
-      setProfile(data)
+      if (!data || data.error === 'not_authenticated') {
+        setProfileState('error')
+      } else if (data.error === 'not_found') {
+        setProfileState('not_found')
+      } else if (data.approved === false) {
+        setProfile(data)
+        setProfileState('pending')
+      } else {
+        setProfile(data)
+        setProfileState('found')
+      }
     }
     load()
   }, [user])
 
-  // Load assigned session worksheets
   useEffect(() => {
-    if (!profile?.team_id || !profile?.email) return
+    if (profileState !== 'found' || !profile?.team_id) return
     setWorksheetsLoading(true)
     supabase
       .rpc('get_portal_worksheets', { p_email: profile.email, p_team_id: profile.team_id })
-      .then(({ data }) => {
-        setWorksheets(data ?? [])
-        setWorksheetsLoading(false)
-      })
-  }, [profile])
+      .then(({ data }) => { setWorksheets(data ?? []); setWorksheetsLoading(false) })
+  }, [profile, profileState])
+
+  useEffect(() => {
+    if (profileState !== 'found') return
+    setReportsLoading(true)
+    supabase.rpc('get_my_reports')
+      .then(({ data }) => { setReports(data ?? []); setReportsLoading(false) })
+  }, [profile, profileState])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     navigate('/sign-in', { replace: true })
   }
 
-  if (authLoading || profileLoading) {
+  function handleTop5Saved(newTop5) {
+    setProfile(p => ({ ...p, top5: newTop5 }))
+    setShowEditTop5(false)
+  }
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
+
+  if (authLoading || profileState === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-400 text-sm">Loading…</p>
@@ -120,13 +303,45 @@ export default function ParticipantDashboardPage() {
 
   if (!user) return null
 
-  if (!profile) {
+  // ── Request Access (not in system) ───────────────────────────────────────────
+
+  if (profileState === 'not_found') {
+    if (requestSubmitted) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center">
+          <img src="/logo.png" alt="Gallup Strengths" className="h-16 w-auto mb-6" />
+          <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Request submitted!</h1>
+          <p className="text-sm text-gray-500 max-w-sm">
+            A coach will review your request and grant access. Check back here after you hear from them.
+          </p>
+          <button onClick={handleSignOut} className="mt-6 text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2">
+            Sign out
+          </button>
+        </div>
+      )
+    }
+    return <RequestAccessForm userEmail={user.email} onSubmitted={() => setRequestSubmitted(true)} />
+  }
+
+  // ── Pending approval ─────────────────────────────────────────────────────────
+
+  if (profileState === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center">
         <img src="/logo.png" alt="Gallup Strengths" className="h-16 w-auto mb-6" />
-        <h1 className="text-xl font-bold text-gray-900 mb-2">No participant profile found</h1>
+        <div className="w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Access pending</h1>
         <p className="text-sm text-gray-500 max-w-sm">
-          We couldn't find a participant record for <span className="font-medium">{user.email}</span>. Make sure your coach has added you to a session, then try again.
+          Your request has been received. A coach will review and approve your account before your worksheets become available.
         </p>
         <button onClick={handleSignOut} className="mt-6 text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2">
           Sign out
@@ -135,20 +350,34 @@ export default function ParticipantDashboardPage() {
     )
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────────
+
+  if (profileState === 'error' || !profile) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center">
+        <img src="/logo.png" alt="Gallup Strengths" className="h-16 w-auto mb-6" />
+        <h1 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h1>
+        <p className="text-sm text-gray-500 max-w-sm">We couldn't load your profile. Please sign out and try again.</p>
+        <button onClick={handleSignOut} className="mt-6 text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2">
+          Sign out
+        </button>
+      </div>
+    )
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────────────────
+
   const firstName = profile.name?.split(' ')[0] ?? 'there'
-  const hasStrengths = Array.isArray(profile.top5) && profile.top5.length > 0
-  const cards = worksheetCards(profile.email, profile.team_id)
+  const hasStrengths = Array.isArray(profile.top5) && profile.top5.some(Boolean)
+  const cards = evergreenCards(profile.email, profile.team_id)
+  const emailEnc = encodeURIComponent(profile.email)
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <img src="/logo.png" alt="Gallup Strengths" className="h-10 w-auto" />
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={handleSignOut} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             Sign out
           </button>
         </div>
@@ -158,12 +387,14 @@ export default function ParticipantDashboardPage() {
 
         {/* Welcome + Top 5 */}
         <section>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Hi {firstName}!</h1>
-          <p className="text-gray-500 text-sm mb-6">Your CliftonStrengths dashboard.</p>
+          <div className="flex items-start justify-between mb-1">
+            <h1 className="text-2xl font-bold text-gray-900">Hi {firstName}!</h1>
+          </div>
+          <p className="text-gray-500 text-sm mb-5">Your CliftonStrengths dashboard.</p>
 
           {hasStrengths ? (
-            <div className="flex flex-wrap gap-2">
-              {profile.top5.map((s, i) => {
+            <div className="flex flex-wrap gap-2 items-center">
+              {profile.top5.filter(Boolean).map((s, i) => {
                 const c = getStrengthColors(s)
                 return (
                   <div
@@ -176,35 +407,30 @@ export default function ParticipantDashboardPage() {
                   </div>
                 )
               })}
+              <button
+                onClick={() => setShowEditTop5(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 border border-dashed border-gray-300 hover:border-brand-400 hover:text-brand-600 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Edit
+              </button>
             </div>
           ) : (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
-              Your Top 5 strengths haven't been entered yet. Your coach will add them before your session.
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800 flex items-start justify-between gap-4">
+              <p>Your Top 5 strengths haven't been entered yet. Your coach will add them before your session.</p>
+              <button
+                onClick={() => setShowEditTop5(true)}
+                className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2"
+              >
+                Add mine
+              </button>
             </div>
           )}
         </section>
 
-        {/* Evergreen worksheets */}
-        <section>
-          <h2 className="text-base font-bold text-gray-900 mb-4">Your Worksheets</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {cards.map(card => (
-              <Link
-                key={card.id}
-                to={card.href}
-                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-brand-300 hover:shadow-sm transition-all group"
-              >
-                <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 mb-3 group-hover:bg-brand-100 transition-colors">
-                  {card.icon}
-                </div>
-                <p className="font-semibold text-gray-900 text-sm mb-1">{card.name}</p>
-                <p className="text-xs text-gray-500 leading-relaxed">{card.description}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        {/* Session worksheets */}
+        {/* Session Worksheets */}
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-4">Session Worksheets</h2>
           {worksheetsLoading ? (
@@ -235,9 +461,71 @@ export default function ParticipantDashboardPage() {
             </div>
           )}
         </section>
+
+        {/* Reports */}
+        {(reportsLoading || reports.length > 0) && (
+          <section>
+            <h2 className="text-base font-bold text-gray-900 mb-4">Reports</h2>
+            {reportsLoading ? (
+              <p className="text-sm text-gray-400">Loading…</p>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+                {reports.map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => navigate(`/report/${r.id}?email=${emailEnc}`)}
+                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 shrink-0">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-900">{r.name}</p>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Tools for Continued Learning */}
+        <section>
+          <h2 className="text-base font-bold text-gray-900 mb-1">Tools for Continued Learning</h2>
+          <p className="text-sm text-gray-500 mb-4">Worksheets you can return to anytime — they auto-save as you work.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {cards.map(card => (
+              <Link
+                key={card.id}
+                to={card.href}
+                className="bg-white border border-gray-200 rounded-xl p-5 hover:border-brand-300 hover:shadow-sm transition-all group"
+              >
+                <div className="w-9 h-9 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600 mb-3 group-hover:bg-brand-100 transition-colors">
+                  {card.icon}
+                </div>
+                <p className="font-semibold text-gray-900 text-sm mb-1">{card.name}</p>
+                <p className="text-xs text-gray-500 leading-relaxed">{card.description}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+
       </main>
 
       <SiteFooter />
+
+      {showEditTop5 && (
+        <EditTop5Modal
+          currentTop5={profile.top5}
+          onSave={handleTop5Saved}
+          onClose={() => setShowEditTop5(false)}
+        />
+      )}
     </div>
   )
 }

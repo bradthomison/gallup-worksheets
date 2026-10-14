@@ -930,6 +930,8 @@ export default function ParticipantsPage() {
   const [reportsPersonId, setReportsPersonId] = useState(null)
   const [customReportModal, setCustomReportModal] = useState(null)
   const [reports, setReports] = useState([])
+  const [pendingRequests, setPendingRequests] = useState([])
+  const [approvingId, setApprovingId] = useState(null)
 
   // Add Team modal
   const [addTeamModal, setAddTeamModal] = useState(false)
@@ -938,15 +940,24 @@ export default function ParticipantsPage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [{ data }, { data: teamsData }, { data: reportsData }] = await Promise.all([
+    const [{ data }, { data: teamsData }, { data: reportsData }, { data: pendingData }] = await Promise.all([
       supabase.from('people').select('*').order('name'),
       supabase.from('teams').select('*').order('name'),
       supabase.from('reports').select('*').order('name'),
+      supabase.rpc('get_pending_requests'),
     ])
     setPeople(data ?? [])
     setTeams(teamsData ?? [])
     setReports(reportsData ?? [])
+    setPendingRequests(pendingData ?? [])
     setLoading(false)
+  }
+
+  async function handleApprovePerson(id) {
+    setApprovingId(id)
+    await supabase.rpc('approve_participant', { p_people_id: id })
+    setApprovingId(null)
+    load()
   }
 
   async function handleSaveEdit(id, updates) {
@@ -1140,6 +1151,35 @@ ${pages.map(html => { const m = html.match(/<body>([\s\S]*)<\/body>/); return `<
           onClose={() => { setAddTeamModal(false); setAddTeamCallback(null) }}
         />
       )}
+      {pendingRequests.length > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
+            <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">{pendingRequests.length}</span>
+            <h2 className="text-sm font-bold text-amber-900">Access Requests Pending Approval</h2>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {pendingRequests.map(p => (
+              <div key={p.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                  <p className="text-xs text-gray-500">{p.email}</p>
+                  {(p.top5 ?? []).some(Boolean) && (
+                    <p className="text-xs text-gray-400 mt-0.5">{(p.top5 ?? []).filter(Boolean).join(', ')}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleApprovePerson(p.id)}
+                  disabled={approvingId === p.id}
+                  className="shrink-0 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {approvingId === p.id ? 'Approving…' : 'Approve'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Participants</h1>
         <div className="flex gap-2">
