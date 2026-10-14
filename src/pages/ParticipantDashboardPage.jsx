@@ -291,6 +291,48 @@ export default function ParticipantDashboardPage() {
     setShowEditTop5(false)
   }
 
+  function printMyNameTent(person) {
+    const strengths = (person.top5 ?? []).filter(Boolean)
+    if (!strengths.length) return
+    const domainColor = {
+      Analytical: '#16a34a', Context: '#16a34a', Futuristic: '#16a34a', Ideation: '#16a34a',
+      Input: '#16a34a', Intellection: '#16a34a', Learner: '#16a34a', Strategic: '#16a34a',
+      Activator: '#ea580c', Command: '#ea580c', Communication: '#ea580c', Competition: '#ea580c',
+      Maximizer: '#ea580c', 'Self-Assurance': '#ea580c', Significance: '#ea580c', Woo: '#ea580c',
+      Adaptability: '#2563eb', Connectedness: '#2563eb', Developer: '#2563eb', Empathy: '#2563eb',
+      Harmony: '#2563eb', Includer: '#2563eb', Individualization: '#2563eb', Positivity: '#2563eb', Relator: '#2563eb',
+      Achiever: '#7c3aed', Arranger: '#7c3aed', Belief: '#7c3aed', Consistency: '#7c3aed',
+      Deliberative: '#7c3aed', Discipline: '#7c3aed', Focus: '#7c3aed', Responsibility: '#7c3aed', Restorative: '#7c3aed',
+    }
+    function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+    const rows = strengths.map(s => `<div style="font-size:19pt;font-weight:800;color:${domainColor[s]||'#374151'};margin:3px 0;">${esc(s)}</div>`).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+      @page{size:landscape;margin:0}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:white}
+      .page{width:100vw;height:100vh;display:flex;flex-direction:column}
+      .fold-row{height:12px;position:relative;flex-shrink:0}
+      .tick{position:absolute;top:0;bottom:0;width:1px;background:#555;transform:translateX(-50%)}
+      .panels{flex:1;display:flex}
+      .panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px 16px}
+      .sep{border-left:1px solid #d1d5db;border-right:1px solid #d1d5db}
+      .slist{display:flex;flex-direction:column;align-items:center}
+      .name{font-size:46pt;font-weight:900;color:#111827;text-align:center;line-height:1.05;letter-spacing:-0.03em}
+      @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+    </style></head><body>
+    <div class="page">
+      <div class="fold-row"><div class="tick" style="left:33.333%"></div><div class="tick" style="left:66.666%"></div></div>
+      <div class="panels">
+        <div class="panel" style="transform:rotate(180deg)"><div class="slist">${rows}</div></div>
+        <div class="panel sep" style="transform:rotate(180deg)"><div class="name">${esc(person.name)}</div></div>
+        <div class="panel"><div class="slist">${rows}</div><div class="name" style="margin-top:18px">${esc(person.name)}</div></div>
+      </div>
+      <div class="fold-row"><div class="tick" style="left:33.333%"></div><div class="tick" style="left:66.666%"></div></div>
+    </div>
+    <script>window.addEventListener('load',function(){window.print()})</script>
+    </body></html>`
+    const win = window.open('', '_blank', 'noopener')
+    win.document.open(); win.document.write(html); win.document.close()
+  }
+
   // ── Loading ──────────────────────────────────────────────────────────────────
 
   if (authLoading || profileState === 'loading') {
@@ -596,6 +638,24 @@ export default function ParticipantDashboardPage() {
                 <p className="font-semibold text-gray-900 text-sm mb-1">Theme Spark</p>
                 <p className="text-xs text-gray-500 leading-relaxed">Visual distribution of talent across the team</p>
               </Link>
+            </div>
+          </section>
+        )}
+
+        {/* Print name tent */}
+        {hasStrengths && (
+          <section>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">Table Name Tent</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Print a folded name tent to place at your seat during a session.</p>
+              </div>
+              <button
+                onClick={() => printMyNameTent(profile)}
+                className="shrink-0 ml-4 text-sm font-semibold text-gray-700 hover:text-gray-900 border border-gray-200 bg-white hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors"
+              >
+                Print Name Tent
+              </button>
             </div>
           </section>
         )}
