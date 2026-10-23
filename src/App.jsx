@@ -22,6 +22,7 @@ import PowerOf2LMSPage from './pages/PowerOf2LMSPage'
 import PowerOfMeLMSPage from './pages/PowerOfMeLMSPage'
 import TalentMapPage from './pages/TalentMapPage'
 import ParticipantSignInPage from './pages/ParticipantSignInPage'
+import AuthConfirmPage from './pages/AuthConfirmPage'
 import ParticipantDashboardPage from './pages/ParticipantDashboardPage'
 import HomePage from './pages/HomePage'
 import ReportsPage from './pages/ReportsPage'
@@ -82,6 +83,7 @@ export default function App() {
       {/* Participants sign in at the site root; coaches at /coach. /login and /sign-in stay as aliases for old links. */}
       <Route path="/" element={<ParticipantSignInPage />} />
       <Route path="/coach" element={<CoachEntry />} />
+      <Route path="/auth/confirm" element={<AuthConfirmPage />} />
       <Route path="/login" element={<Navigate to="/coach" replace />} />
       <Route path="/worksheet/:slug" element={<WorksheetPage />} />
       <Route path="/session/:sessionId/join" element={<SessionJoinPage />} />

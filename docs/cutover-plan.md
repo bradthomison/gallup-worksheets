@@ -1,17 +1,16 @@
 # Cutover plan: Vercel → mystrengthstraining.com
 
-Goal: anyone who follows an old Vercel link ends up in the right place on `kumc.mystrengthstraining.com`, and everyone who can no longer *reach* Vercel (the KUMC network blocks it) gets new links.
+Goal: anyone who follows an old Vercel link ends up in the right place on `kumc.mystrengthstraining.com`, and everyone has one address to remember.
 
-Status as of 2026-10-23: the app already runs on Cloudflare at `kumc.mystrengthstraining.com` against the same Supabase database. Vercel (`gallup-worksheets.vercel.app`) is still the live site. Nothing below is switched on yet.
+Status as of 2026-10-23: the app already runs on Cloudflare at `kumc.mystrengthstraining.com` against the same Supabase database. Vercel (`gallup-worksheets.vercel.app`) is still the live site. The redirect has been tested but is not switched on yet.
 
-## 1. Two groups of people
+## 1. Why no mass resend is needed
 
-| | Can load Vercel | Cannot load Vercel (KUMC network) |
-|---|---|---|
-| Follows an old link | **Redirect fixes it** | Blocked before any redirect can happen. **Needs a new link.** |
-| What fixes it | `vercel.json` redirect (section 2) | Resend links + update Acorn + new QR codes (sections 3–5) |
+Until now, participants reached the app through a QR code shown during a session, and there was no way to get back to it afterwards. The participant home page (`/me`) is the fix. KUMC blocked outgoing mail containing the Vercel address, so no old link was ever circulated by email. A test message with the new address was **not** blocked.
 
-The redirect helps phones, home networks and anyone off the KUMC network. The people you are actually worried about need new links.
+So: no "we've moved" email, no bulk resend. The new address (`kumc.mystrengthstraining.com`) goes out for the first time, on your schedule.
+
+What the redirect still covers: old QR scans, browser history and bookmarks, coach bookmarks, and anything off the KUMC network. People on the KUMC network could not load Vercel anyway, so for them the new address is simply the first link they get.
 
 ## 2. Vercel redirects
 
@@ -37,33 +36,13 @@ The redirect helps phones, home networks and anyone off the KUMC network. The pe
 
 **Rollback.** Revert the commit; Vercel redeploys the old config in about a minute. The Vercel project and Supabase data are untouched, so nothing is lost.
 
-## 3. Resend plan (people who cannot reach Vercel)
+## 3. Sending the new address
 
-There is no record of which emails were sent, so this plan assumes anyone with an open session may be holding an old link.
+Give people the root address, `https://kumc.mystrengthstraining.com` (shown as the QR code on the coach home page). They enter their email, receive a sign-in link, and land on their own page. Nothing else needs to be sent.
 
-**Audience (from the database today):**
+**One thing to test (not yet confirmed):** the sign-in email is sent by the app, from the sign-in service, to each person's inbox, and the link inside it points at the data service's address (a `supabase.co` address), not at `mystrengthstraining.com`. Send a sign-in link to a real `@kumc.edu` address and check that it arrives (not quarantined) and the link opens. Your own sends from Outlook with the new address already pass.
 
-| Session | Date | Coach | People | Submitted | Suggestion |
-|---|---|---|---|---|---|
-| RCH Talent Map (Team Strengths Overview) | 2027-02-01 | tmorrow | 22 | 0 | Wait until closer to the date |
-| Newman Reg. Hosp. Strengths & SL | 2026-11-18 | tmorrow | 29 | 0 | Resend |
-| SWMC Leading Through Change | 2026-10-20 | bthomison | 54 | 0 | Resend if worksheets are still open |
-| SWMC Motivation | 2026-10-20 | bthomison | 54 | 0 | Resend if worksheets are still open |
-| Strengths Overview (Personal Insights) | 2026-09-25 | bthomison | 21 | 2 | Skip unless reports are still in use |
-| Older sessions (Decision Making, Frontiers, Motivational Approaches, RHES…) | Apr–Sep | bthomison | 142 | 8 | Skip; covered by the announcement below |
-
-248 distinct people have been in sessions; 239 are on teams with strengths on file.
-
-**Step A. One announcement to everyone (≈239 people).** "We've moved. Your strengths page now lives at kumc.mystrengthstraining.com. Enter your email and we'll send you a sign-in link. Old links will stop working inside the KUMC network." Everything a person needs hangs off their personal page (`/me`), so this single email replaces most individual resends.
-
-**Step B. Resend worksheet links for sessions still in use** (Newman and SWMC above). Open each session at `kumc.mystrengthstraining.com`, choose **Send Links** and pick the recipients (everyone, or just the ones who haven't started). Links are built from the address you are viewing, so they come out as new-site links automatically. Sessions that use Personal Insights, Power of 2, Power of Me or Team Overview open the right page after the person's link loads.
-
-**Step C. Individual report links (Send Link on the Participants page).** Not tracked, so not resent one by one. People reach those reports from their personal page after Step A.
-
-**Cautions.**
-- Check your Resend plan's daily sending cap before sending ~250+ emails in one day; spread the sends over days if needed. (Cloudflare Email Service can take over later.)
-- KUMC may rewrite or scan links in incoming mail; send one test to your own `@kumc.edu` address first.
-- Suggested follow-up feature: record `links_sent_at` on participants so the next migration doesn't have to guess.
+Optional later: record when a link was last sent to each person, so future moves don't have to guess.
 
 ## 4. Acorn LMS links (update by hand)
 
@@ -96,18 +75,18 @@ These are the "Acorn Course Link" URLs shown on the Session Topics and Reports p
 
 ## 6. Order of operations
 
-**Before go-live**
-1. (You) Add the redirect URL in Supabase (section 5).
-2. (You) Test a participant sign-in end to end with `brad.thomison@gmail.com`: request link at the site root, click it, land on `/me`.
-3. (You) Update the Acorn links (section 4).
-4. (Me, after your OK) Push the test redirect rule and verify path + query handling on Vercel.
-5. (You) Send yourself a test of Step A / B emails at your `@kumc.edu` address.
+**Done**
+1. Redirect URL added in Supabase.
+2. Participant sign-in tested end to end.
+3. Redirect rule tested on Vercel (path and query string both survive).
 
-**Go-live (quiet window)**
-6. (Me) Swap the test rule for the catch-all, push, and check six sample links.
-7. (You) Send Step A, then Step B.
-8. (You) Re-print QR codes where needed.
+**Still to do**
+4. (You) Test a sign-in link to an `@kumc.edu` address (section 3).
+5. (You) Update the Acorn links (section 4), whenever convenient.
+6. (You) Give the other two coaches a heads-up: new address, and they sign in again once.
+7. (Me, when you say go) Swap the test rule for the catch-all, push, and check six sample links.
+8. (You) Re-print or re-download session QR codes where they will be reused (section 5).
 
 **After**
-9. Watch for confusion for 1–2 weeks. Then switch the redirect to permanent (308).
+9. Watch for confusion for 1–2 weeks, then switch the redirect to permanent (308).
 10. Keep the Vercel project alive indefinitely; it only serves redirects and costs nothing.

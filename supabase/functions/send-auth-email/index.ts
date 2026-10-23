@@ -125,6 +125,28 @@ function buildMagicLinkEmail(opts: {
   return { html, subject }
 }
 
+// ── Sign-in link ─────────────────────────────────────────────────────────────
+// Prefer a link on our own site (/auth/confirm). The page checks the token itself when the person
+// clicks Continue, so the address in the email is ours and mail scanners that pre-open links can't
+// use up the one-time token. Falls back to Supabase's own verify link for anything else
+// (other hosts such as the old Vercel site or localhost, or action types the page doesn't handle).
+
+const OWN_DOMAIN = 'mystrengthstraining.com'
+const OWN_DOMAIN_TYPES = ['magiclink', 'signup', 'invite', 'recovery']
+
+function ownDomainConfirmUrl(redirectTo: string | undefined, tokenHash: string, type: string): string | null {
+  if (!redirectTo || !OWN_DOMAIN_TYPES.includes(type)) return null
+  try {
+    const u = new URL(redirectTo)
+    const ours = u.hostname === OWN_DOMAIN || u.hostname.endsWith('.' + OWN_DOMAIN)
+    if (u.protocol !== 'https:' || !ours) return null
+    const next = (u.pathname === '/' ? '/me' : u.pathname) + u.search
+    return `${u.origin}/auth/confirm?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}&next=${encodeURIComponent(next)}`
+  } catch {
+    return null
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -149,9 +171,10 @@ serve(async (req) => {
 
     const { token_hash, redirect_to, email_action_type } = email_data
 
-    // Build the Supabase confirm URL
+    // Build the confirm URL (own domain when possible, otherwise Supabase's verify link)
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const confirmUrl = `${supabaseUrl}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to ?? supabaseUrl)}`
+    const confirmUrl = ownDomainConfirmUrl(redirect_to, token_hash, email_action_type)
+      ?? `${supabaseUrl}/auth/v1/verify?token=${token_hash}&type=${email_action_type}&redirect_to=${encodeURIComponent(redirect_to ?? supabaseUrl)}`
 
     // Look up the participant's first name and coach name
     const supabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
