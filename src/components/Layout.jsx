@@ -27,7 +27,7 @@ export default function Layout({ children }) {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
-    navigate('/login')
+    navigate('/coach')
   }
 
   function startEditName() {
@@ -49,7 +49,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-          <Link to="/">
+          <Link to="/coach">
             <img src="/logo.png" alt="Gallup Strengths" className="h-[60px] w-auto" />
           </Link>
           <div className="flex items-center gap-6">

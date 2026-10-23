@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { useIsCoach } from './hooks/useIsCoach'
+import { supabase } from './lib/supabase'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import SessionPage from './pages/SessionPage'
@@ -27,10 +29,49 @@ import TeamGridPage from './pages/TeamGridPage'
 import TeamSparkPage from './pages/TeamSparkPage'
 import TeamSummaryPage from './pages/TeamSummaryPage'
 
+function FullPageMessage({ children }) {
+  return <div className="flex items-center justify-center min-h-screen px-4 text-center text-gray-500">{children}</div>
+}
+
+// Shown if the coach check itself fails (for example the database is unreachable): fail closed, never open.
+function CoachCheckFailed() {
+  async function signOut() {
+    await supabase.auth.signOut()
+    window.location.assign('/coach')
+  }
+  return (
+    <FullPageMessage>
+      <div className="space-y-3">
+        <p className="text-gray-800 font-medium">We couldn't verify your coach access.</p>
+        <p className="text-sm">Check your connection and try again.</p>
+        <div className="flex items-center justify-center gap-4 text-sm">
+          <button onClick={() => window.location.reload()} className="text-brand-500 hover:underline">Try again</button>
+          <button onClick={signOut} className="text-gray-500 hover:underline">Sign out</button>
+        </div>
+      </div>
+    </FullPageMessage>
+  )
+}
+
+// Coach pages are for coaches only. Signed out -> coach login; signed in but not a coach -> their own page (/me).
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="flex items-center justify-center min-h-screen text-gray-500">Loading…</div>
-  return user ? children : <Navigate to="/login" replace />
+  const coach = useIsCoach(user)
+  if (loading || (user && coach.loading)) return <FullPageMessage>Loading…</FullPageMessage>
+  if (!user) return <Navigate to="/coach" replace />
+  if (coach.error) return <CoachCheckFailed />
+  if (!coach.isCoach) return <Navigate to="/me" replace />
+  return children
+}
+
+// /coach is the coach entry point: the login form when signed out, the coach home for coaches.
+function CoachEntry() {
+  const { user, loading } = useAuth()
+  const coach = useIsCoach(user)
+  if (loading || (user && coach.loading)) return <FullPageMessage>Loading…</FullPageMessage>
+  if (!user) return <LoginPage />
+  if (coach.error) return <CoachCheckFailed />
+  return coach.isCoach ? <HomePage /> : <Navigate to="/me" replace />
 }
 
 // Participant pages handle their own auth guard internally (redirects to /sign-in)
@@ -38,7 +79,10 @@ function PrivateRoute({ children }) {
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      {/* Participants sign in at the site root; coaches at /coach. /login and /sign-in stay as aliases for old links. */}
+      <Route path="/" element={<ParticipantSignInPage />} />
+      <Route path="/coach" element={<CoachEntry />} />
+      <Route path="/login" element={<Navigate to="/coach" replace />} />
       <Route path="/worksheet/:slug" element={<WorksheetPage />} />
       <Route path="/session/:sessionId/join" element={<SessionJoinPage />} />
       <Route path="/lms/:themeId" element={<LMSLandingPage />} />
@@ -55,7 +99,6 @@ export default function App() {
       <Route path="/team-grid" element={<TeamGridPage />} />
       <Route path="/team-spark" element={<TeamSparkPage />} />
       <Route path="/team-summary" element={<TeamSummaryPage />} />
-      <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/sessions/new" element={<PrivateRoute><NewSessionPage /></PrivateRoute>} />
       <Route path="/sessions/:id" element={<PrivateRoute><SessionPage /></PrivateRoute>} />

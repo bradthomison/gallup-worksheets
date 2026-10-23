@@ -2,19 +2,21 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { useIsCoach } from '../hooks/useIsCoach'
 
 export default function ParticipantSignInPage() {
   const { user, loading } = useAuth()
+  const coach = useIsCoach(user)
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState(null)
 
-  // Already signed in → go straight to dashboard
+  // Already signed in → coaches go to the coach home, everyone else to their own page
   useEffect(() => {
-    if (!loading && user) navigate('/me', { replace: true })
-  }, [user, loading])
+    if (!loading && user && !coach.loading) navigate(coach.isCoach ? '/coach' : '/me', { replace: true })
+  }, [user, loading, coach.loading, coach.isCoach])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -91,7 +93,7 @@ export default function ParticipantSignInPage() {
             </button>
             <p className="text-center text-xs text-gray-400">
               Coach?{' '}
-              <a href="/login" className="text-brand-500 hover:underline">Sign in here</a>
+              <a href="/coach" className="text-brand-500 hover:underline">Sign in here</a>
             </p>
           </form>
         )}

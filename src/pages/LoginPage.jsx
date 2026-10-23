@@ -18,7 +18,7 @@ export default function LoginPage() {
     if (error) {
       setError(error.message)
     } else {
-      navigate('/')
+      navigate('/coach')
     }
   }
 

@@ -92,7 +92,7 @@ const NAV_ITEMS = [
 
 export default function HomePage() {
   const [qrDataUrl, setQrDataUrl] = useState(null)
-  const signInUrl = `${window.location.origin}/sign-in`
+  const signInUrl = `${window.location.origin}/`
 
   useEffect(() => {
     QRCode.toDataURL(signInUrl, { width: 400, margin: 2, color: { dark: '#111827', light: '#ffffff' } })

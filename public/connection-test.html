@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Connection test</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #f9fafb; color: #1f2937; margin: 0; padding: 2rem 1rem; }
+  main { max-width: 34rem; margin: 0 auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  p { color: #6b7280; font-size: .9rem; line-height: 1.5; }
+  ul { list-style: none; padding: 0; margin: 1.25rem 0; }
+  li { display: flex; gap: .6rem; align-items: baseline; padding: .5rem 0; border-top: 1px solid #f3f4f6; font-size: .95rem; }
+  .mark { width: 1.25rem; font-weight: 700; }
+  .ok { color: #059669; } .bad { color: #dc2626; } .wait { color: #9ca3af; }
+  #summary { font-weight: 600; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Connection test</h1>
+  <p>This page checks whether your network can reach the Strengths Worksheets services. It collects no personal information.</p>
+  <ul>
+    <li><span class="mark ok">&#10003;</span><span>This page loaded from <strong id="host"></strong></span></li>
+    <li><span class="mark wait" id="m-main">&hellip;</span><span>Main site (mystrengthstraining.com)</span></li>
+    <li><span class="mark wait" id="m-db">&hellip;</span><span>Data service (needed to sign in and load reports)</span></li>
+  </ul>
+  <p id="summary">Checking&hellip;</p>
+  <p>If anything shows a red &#10007;, please send a screenshot of this page to your coach.</p>
+</main>
+<script>
+  document.getElementById('host').textContent = location.hostname;
+  function check(id, url) {
+    return fetch(url, { mode: 'no-cors', cache: 'no-store' }).then(
+      function () { mark(id, true); return true; },
+      function () { mark(id, false); return false; }
+    );
+  }
+  function mark(id, ok) {
+    var el = document.getElementById(id);
+    el.textContent = ok ? '\u2713' : '\u2717';
+    el.className = 'mark ' + (ok ? 'ok' : 'bad');
+  }
+  Promise.all([
+    check('m-main', 'https://mystrengthstraining.com/connection-test.html'),
+    check('m-db', 'https://horijrgrayjtbybncsee.supabase.co/auth/v1/health')
+  ]).then(function (r) {
+    document.getElementById('summary').textContent = (r[0] && r[1])
+      ? 'All good. Your network can reach everything needed.'
+      : 'Something is blocked on your network.';
+  });
+</script>
+</body>
+</html>
