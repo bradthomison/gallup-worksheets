@@ -23,39 +23,28 @@ export default function LMSWorksheetPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: ws, error: wsErr } = await supabase
-        .from('lms_worksheets')
-        .select('*, people:people_id(*), theme:theme_id(*)')
-        .eq('worksheet_url_slug', slug)
-        .single()
+      try {
+        const { data, error: rpcErr } = await supabase.rpc('get_lms_worksheet', { p_slug: slug })
+        if (rpcErr || !data || data.error) { setError('Worksheet not found.'); return }
 
-      if (wsErr || !ws) { setError('Worksheet not found.'); setLoading(false); return }
+        setParticipant(data.participant)
+        setSession({ ...data.theme, title: data.theme.name })
+        setWorksheetId(data.worksheet_id)
 
-      const part = ws.people
-      const sess = {
-        ...ws.theme,
-        title: ws.theme.name,
+        const responses = data.responses ?? []
+        if (responses.length) {
+          const cellMap = {}
+          responses.forEach(r => {
+            cellMap[`${r.prompt_index}_${r.strength_index}`] = r.response_text
+          })
+          setCells(cellMap)
+          if (responses.some(r => r.submitted_at)) setSubmitted(true)
+        }
+      } catch {
+        setError('Worksheet not found.')
+      } finally {
+        setLoading(false)
       }
-      setParticipant(part)
-      setSession(sess)
-      setWorksheetId(ws.id)
-
-      // Load existing responses
-      const { data: responses } = await supabase
-        .from('lms_responses')
-        .select('*')
-        .eq('lms_worksheet_id', ws.id)
-
-      if (responses?.length) {
-        const cellMap = {}
-        responses.forEach(r => {
-          cellMap[`${r.prompt_index}_${r.strength_index}`] = r.response_text
-        })
-        setCells(cellMap)
-        if (responses.some(r => r.submitted_at)) setSubmitted(true)
-      }
-
-      setLoading(false)
     }
     load()
   }, [slug])
@@ -64,18 +53,16 @@ export default function LMSWorksheetPage() {
     setCells(prev => ({ ...prev, [`${promptIdx}_${strengthIdx}`]: value }))
   }
 
-  function buildRows(submittedAt = null) {
+  function buildRows() {
     const prompts = session.prompts ?? []
     const strengths = participant.top5 ?? []
     const rows = []
     prompts.forEach((_, pi) => {
       strengths.forEach((_, si) => {
         rows.push({
-          lms_worksheet_id: worksheetId,
           prompt_index: pi,
           strength_index: si,
           response_text: cells[`${pi}_${si}`] ?? '',
-          submitted_at: submittedAt,
         })
       })
     })
@@ -85,11 +72,9 @@ export default function LMSWorksheetPage() {
   async function handleSaveDraft() {
     setSaving(true)
     setError(null)
-    const { error: upsertErr } = await supabase
-      .from('lms_responses')
-      .upsert(buildRows(null), { onConflict: 'lms_worksheet_id,prompt_index,strength_index' })
+    const { data, error: upsertErr } = await supabase.rpc('save_lms_responses', { p_slug: slug, p_rows: buildRows(), p_submit: false })
     setSaving(false)
-    if (upsertErr) { setError(upsertErr.message); return }
+    if (upsertErr || data?.error) { setError('Could not save. Please try again.'); return }
     setSavedAt(new Date())
   }
 
@@ -98,11 +83,9 @@ export default function LMSWorksheetPage() {
     setSubmitting(true)
     setError(null)
 
-    const { error: upsertErr } = await supabase
-      .from('lms_responses')
-      .upsert(buildRows(new Date().toISOString()), { onConflict: 'lms_worksheet_id,prompt_index,strength_index' })
+    const { data, error: upsertErr } = await supabase.rpc('save_lms_responses', { p_slug: slug, p_rows: buildRows(), p_submit: true })
 
-    if (upsertErr) { setError(upsertErr.message); setSubmitting(false); return }
+    if (upsertErr || data?.error) { setError('Could not submit. Please try again.'); setSubmitting(false); return }
 
     setSubmitted(true)
     setSubmitting(false)
@@ -110,10 +93,7 @@ export default function LMSWorksheetPage() {
 
   async function handleReopen() {
     setReopening(true)
-    await supabase
-      .from('lms_responses')
-      .update({ submitted_at: null })
-      .eq('lms_worksheet_id', worksheetId)
+    await supabase.rpc('reopen_lms_worksheet', { p_slug: slug })
     setConfirmReopen(false)
     setReopening(false)
     setSubmitted(false)

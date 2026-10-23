@@ -23,15 +23,20 @@ export default function ParticipantSignInPage() {
     if (!email.trim()) return
     setSubmitting(true)
     setError(null)
-    const { error: err } = await supabase.auth.signInWithOtp({
-      email: email.trim().toLowerCase(),
-      options: { emailRedirectTo: `${window.location.origin}/me` },
+    // The server only sends links to people already on file (and creates their login the first time).
+    const { data } = await supabase.functions.invoke('participant-sign-in', {
+      body: { email: email.trim().toLowerCase(), redirect_to: `${window.location.origin}/me` },
     })
     setSubmitting(false)
-    if (err) {
-      setError(err.message)
-    } else {
+    const status = data?.status
+    if (status === 'sent') {
       setSent(true)
+    } else if (status === 'not_found') {
+      setError("We couldn't find that email address. Check the spelling, or ask your coach to add you.")
+    } else if (status === 'rate_limited') {
+      setError('A link was just sent. Please wait a minute before requesting another.')
+    } else {
+      setError('Something went wrong. Please try again.')
     }
   }
 
