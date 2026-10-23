@@ -44,9 +44,9 @@ Give people the root address, `https://kumc.mystrengthstraining.com` (shown as t
 
 Optional later: record when a link was last sent to each person, so future moves don't have to guess.
 
-## 4. Acorn LMS links (update by hand)
+## 4. Acorn LMS links (reference only)
 
-These are the "Acorn Course Link" URLs shown on the Session Topics and Reports pages. Anything pasted into Acorn today points at Vercel and is blocked for KUMC users. The new addresses already work, so **this can be done before go-live**.
+No Acorn trainings currently send people to this app, so nothing needs updating. These are the "Acorn Course Link" URLs the Session Topics and Reports pages show; they are built from the address you are viewing, so they already use the new site. Use this table if Acorn trainings are added later.
 
 | Item | New link |
 |---|---|
@@ -82,7 +82,7 @@ These are the "Acorn Course Link" URLs shown on the Session Topics and Reports p
 
 **Still to do**
 4. (You) Test a sign-in link to an `@kumc.edu` address (section 3).
-5. (You) Update the Acorn links (section 4), whenever convenient.
+5. ~~Update the Acorn links~~ Not needed (no Acorn trainings use them).
 6. (You) Give the other two coaches a heads-up: new address, and they sign in again once.
 7. (Me, when you say go) Swap the test rule for the catch-all, push, and check six sample links.
 8. (You) Re-print or re-download session QR codes where they will be reused (section 5).

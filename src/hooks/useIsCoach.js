@@ -18,19 +18,22 @@ function lookup(userId) {
   return p
 }
 
+// Returns { loading, isCoach, error }. While the answer for the *current* user has not come back,
+// loading is true, so callers never treat "not asked yet" as "not a coach".
 export function useIsCoach(user) {
-  const [state, setState] = useState({ loading: !!user, isCoach: false, error: null })
+  const [result, setResult] = useState({ userId: null, isCoach: false, error: null })
 
   useEffect(() => {
-    if (!user) { setState({ loading: false, isCoach: false, error: null }); return }
+    if (!user) return
     let cancelled = false
-    setState(s => ({ ...s, loading: true }))
     lookup(user.id).then(
-      isCoach => { if (!cancelled) setState({ loading: false, isCoach, error: null }) },
-      error => { if (!cancelled) setState({ loading: false, isCoach: false, error }) },
+      isCoach => { if (!cancelled) setResult({ userId: user.id, isCoach, error: null }) },
+      error => { if (!cancelled) setResult({ userId: user.id, isCoach: false, error }) },
     )
     return () => { cancelled = true }
   }, [user?.id])
 
-  return state
+  if (!user) return { loading: false, isCoach: false, error: null }
+  if (result.userId !== user.id) return { loading: true, isCoach: false, error: null }
+  return { loading: false, isCoach: result.isCoach, error: result.error }
 }
