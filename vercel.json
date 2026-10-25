@@ -10,7 +10,7 @@
   ],
   "redirects": [
     {
-      "source": "/__redirect-test/:path*",
+      "source": "/:path*",
       "destination": "https://kumc.mystrengthstraining.com/:path*",
       "permanent": false
     }
