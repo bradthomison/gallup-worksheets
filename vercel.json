@@ -10,6 +10,11 @@
   ],
   "redirects": [
     {
+      "source": "/",
+      "destination": "https://kumc.mystrengthstraining.com/",
+      "permanent": false
+    },
+    {
       "source": "/:path*",
       "destination": "https://kumc.mystrengthstraining.com/:path*",
       "permanent": false
